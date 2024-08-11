@@ -4,6 +4,7 @@ import uuid
 import random
 import telebot
 import threading
+from flask import Flask
 
 # الثوابت
 telegram_bot_token = '7168692937:AAEkUQl949WySy4aPoIDI3q06xmUGDRJJY4'
@@ -39,6 +40,8 @@ bot = telebot.TeleBot(telegram_bot_token)
 user_chat_ids = {}
 running = {}  # تعريف متغير running
 selected_game = {}  # تخزين اللعبة المختارة لكل مستخدم
+
+app = Flask(__name__)
 
 def generate_client_id():
     timestamp = int(time.time() * 1000)
@@ -184,9 +187,21 @@ def handle_telegram_command(message):
         else:
             bot.reply_to(message, "التجميع موقوف بالفعل.")
 
+@app.route('/')
+def health_check():
+    return "Bot is running!"
+
+def start_flask_app():
+    app.run(host='0.0.0.0', port=8000)
+
 @bot.message_handler(func=lambda message: True)
 def echo_all(message):
     handle_telegram_command(message)
 
 if __name__ == '__main__':
+    # تشغيل خادم Flask في خيط منفصل
+    flask_thread = threading.Thread(target=start_flask_app)
+    flask_thread.start()
+
+    # تشغيل بوت Telegram
     bot.polling()
