@@ -1,5 +1,5 @@
-flask
-pyTelegramBotAPI
-requests
+python-telegram-bot
+googletrans==4.0.0-rc1
+
 
 
