@@ -195,4 +195,6 @@ def echo_all(message):
     handle_telegram_command(message)
 
 if __name__ == '__main__':
+    # استخدام polling للتأكد من استمرار استقبال الرسائل بدون الحاجة لأي منافذ أو HTTP servers
     bot.polling(none_stop=True)
+
