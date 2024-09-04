@@ -1,79 +1,54 @@
+from telethon import TelegramClient
+from telethon.errors import SessionPasswordNeededError
+from telethon.tl.functions.account import UpdateProfileRequest
+from datetime import datetime
+import pytz
+import asyncio
 import os
-import logging
-from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
-from textblob import TextBlob
 
-# جلب التوكن من المتغير البيئي
-TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+# قراءة القيم من المتغيرات البيئية
+api_id = os.getenv('API_ID')
+api_hash = os.getenv('API_HASH')
+phone_number = os.getenv('PHONE_NUMBER')
 
-if TOKEN is None:
-    raise ValueError("الرجاء تعيين التوكن كمتحول بيئي باسم 'TELEGRAM_BOT_TOKEN'.")
+client = TelegramClient('session_name', api_id, api_hash)
 
-# إعداد نظام التسجيل
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-logger = logging.getLogger(__name__)
+# تحويل الأرقام إلى أرقام مزخرفة بنمط الرياضي
+def to_smart_numbers(number_str):
+    # تحويل الأرقام من 0-9 إلى Unicode مزخرف
+    conversion = str.maketrans('0123456789', '𝟘𝟙𝟚𝟛𝟜𝟝𝟞𝟟𝟠𝟡')
+    return number_str.translate(conversion)
 
-# وظيفة /start
-def start(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text('مرحبًا! أنا بوت التدقيق اللغوي. أرسل لي أي نص وسأقوم بمراجعته من أجلك.')
+async def start_client():
+    await client.start(phone_number)
+    try:
+        # محاولة تسجيل الدخول
+        await client.start()
+    except SessionPasswordNeededError:
+        # طلب كلمة المرور للخطوة الثانية إذا كانت مفعلة
+        password = input('Enter your 2FA password: ')
+        await client.start(password=password)
 
-# وظيفة /help
-def help_command(update: Update, context: CallbackContext) -> None:
-    help_text = (
-        "/start - لبدء المحادثة معي\n"
-        "/help - لعرض هذه الرسالة\n"
-        "ما عليك سوى إرسال أي نص وسأقوم بتدقيقه لغويًا!"
-    )
-    update.message.reply_text(help_text)
+async def update_name():
+    await start_client()
+    me = await client.get_me()
 
-# وظيفة التدقيق اللغوي
-def check_text(update: Update, context: CallbackContext) -> None:
-    text = update.message.text
-    blob = TextBlob(text)
-    corrected_text = blob.correct()
+    # الحصول على الوقت الحالي بتوقيت مصر
+    egypt_tz = pytz.timezone('Africa/Cairo')
+    current_time = datetime.now(egypt_tz).strftime("%H:%M")
+    decorated_time = to_smart_numbers(current_time)
 
-    if text != str(corrected_text):
-        response = f"النص بعد التدقيق:\n{corrected_text}"
-    else:
-        response = "النص الذي أرسلته يبدو صحيحًا من الناحية اللغوية!"
+    # تحديث الاسم الأول
+    new_name = decorated_time  # وضع الوقت المزخرف في الاسم الأول
+    await client(UpdateProfileRequest(first_name=new_name))
 
-    # تدوين الأخطاء في ملف نصي
-    with open("errors_log.txt", "a", encoding="utf-8") as log_file:
-        if text != str(corrected_text):
-            log_file.write(f"Original: {text}\nCorrected: {corrected_text}\n\n")
-        else:
-            log_file.write(f"Original: {text} (No errors found)\n\n")
+    print(f"تم تحديث الاسم إلى: {new_name}")
 
-    update.message.reply_text(response)
+async def main():
+    while True:
+        await update_name()
+        await asyncio.sleep(60)  # إعادة التحديث كل دقيقة
 
-# معالجة الأخطاء
-def error(update: Update, context: CallbackContext) -> None:
-    logger.warning(f'Update "{update}" caused error "{context.error}"')
-
-def main() -> None:
-    # إعداد الـ Updater واستخدام التوكن
-    updater = Updater(TOKEN)
-
-    # الحصول على الـ Dispatcher لتسجيل الـ Handlers
-    dispatcher = updater.dispatcher
-
-    # إضافة الـ Handlers للأوامر
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("help", help_command))
-
-    # إضافة Handler للرسائل النصية التي تحتوي على نصوص
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, check_text))
-
-    # تسجيل معالجة الأخطاء
-    dispatcher.add_error_handler(error)
-
-    # بدء البوت
-    updater.start_polling()
-
-    # إيقاف البوت عند الحاجة
-    updater.idle()
-
-if __name__ == '__main__':
-    main()
+# تشغيل البرنامج
+with client:
+    client.loop.run_until_complete(main())
