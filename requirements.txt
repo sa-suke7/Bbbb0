@@ -1,5 +1,7 @@
-python-telegram-bot
-textblob
+telethon
+pytz
+python-dotenv
+
 
 
 
