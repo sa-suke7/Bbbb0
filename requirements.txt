@@ -1,6 +1,7 @@
-telethon
-pytz
-python-dotenv
+pyTelegramBotAPI
+youtube-search-python
+requests
+yt-dlp
 
 
 
