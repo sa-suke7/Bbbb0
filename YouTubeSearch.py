@@ -131,13 +131,7 @@ def handle_download_choice(call):
 
     output_filename = f"{video_title}.mp3"
     
-    # قراءة الكوكيز من متغير البيئة
-    cookies_string = os.environ.get('YOUTUBE_COOKIES')
-
-    # إذا كنت بحاجة إلى كتابة الكوكيز إلى ملف مؤقت
-    with open('cookies.txt', 'w') as f:
-        f.write(cookies_string)
-
+    # استخدام الكوكيز من ملف 'cookies.txt'
     ydl_opts = {
         'format': 'bestaudio/best',
         'noplaylist': True,
@@ -145,7 +139,7 @@ def handle_download_choice(call):
         'audioformat': 'mp3',
         'outtmpl': output_filename,
         'quiet': True,
-        'cookiefile': 'cookies.txt',  # استخدام الكوكيز
+        'cookiefile': 'cookies.txt',  # استخدام ملف الكوكيز
     }
 
     try:
