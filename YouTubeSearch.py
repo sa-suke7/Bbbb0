@@ -152,7 +152,7 @@ def handle_download_choice(call):
         'audioformat': 'mp3',
         'outtmpl': output_filename,
         'quiet': True,
-        'cookiefile': 'cookies.txt',
+        'cookiefile': 'cookies.txt',  # استخدام ملف الكوكيز
     }
 
     try:
