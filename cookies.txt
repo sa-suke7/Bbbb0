@@ -1,1 +1,4 @@
+# Netscape HTTP Cookie File
+# http://curl.haxx.se/rfc/cookie_spec.html
+.example.com	TRUE	/	FALSE	0	NAME	VALUE
 
