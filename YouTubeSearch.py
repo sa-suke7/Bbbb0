@@ -9,7 +9,10 @@ import threading
 import logging
 import time
 
-# جلب توكن البوت من متغيرات البيئة
+# إعداد السجلات
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# جلب توكن البوت من المتغيرات البيئية
 API_TOKEN = os.getenv('API_TOKEN')
 
 bot = telebot.TeleBot(API_TOKEN)
@@ -17,7 +20,6 @@ bot = telebot.TeleBot(API_TOKEN)
 # تخزين نتائج البحث مؤقتاً
 bot.results = {}
 bot.users = set()
-
 developer_id = 5683930416  # ID المطور
 
 # عند بداية البوت
@@ -57,27 +59,7 @@ def send_welcome(message):
         "-----------------------\n"
         f"• عدد الأعضاء الكلي : {total_users}", parse_mode='HTML')
 
-# إضافة معالج لزر "إذاعة"
-@bot.callback_query_handler(func=lambda call: call.data == "broadcast")
-def broadcast_message(call):
-    if call.message.chat.id == developer_id:
-        bot.send_message(developer_id, "اكتب رسالة الإذاعة لإرسالها لجميع المستخدمين:")
-        bot.register_next_step_handler(call.message, process_broadcast)
-
-def process_broadcast(message):
-    if message.chat.id == developer_id:
-        broadcast_text = message.text
-        for user_id in bot.users:
-            try:
-                bot.send_message(user_id, f"رسالة من المطور:\n{broadcast_text}")
-            except Exception as e:
-                print(f"خطأ في الإرسال للمستخدم {user_id}: {str(e)}")
-        bot.send_message(developer_id, "تم إرسال الرسالة بنجاح.")
-
-# تهيئة نظام السجلات
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-# البحث عن الفيديوهات في خيط منفصل
+# البحث عن الفيديوهات
 @bot.message_handler(func=lambda message: True)
 def search_song(message):
     search_term = message.text
@@ -91,7 +73,7 @@ def search_song(message):
 def handle_search(call):
     search_term = call.data.split("_")[1]
     bot.delete_message(call.message.chat.id, call.message.message_id)
-
+    
     searching_msg = bot.send_message(call.message.chat.id, f"<b>جاري البحث عن:</b> <code>{search_term}</code>...", parse_mode='HTML')
     
     # تشغيل البحث في خيط منفصل
@@ -117,9 +99,36 @@ def perform_search(call, search_term, searching_msg):
     except Exception as e:
         logging.error(f"خطأ أثناء البحث: {str(e)}")
         bot.send_message(call.message.chat.id, f"<b>حدث خطأ أثناء البحث:</b> <code>{str(e)}</code>", parse_mode='HTML')
-# تحديد الحد الأقصى لحجم الملف (50 ميجا)
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 ميجا بايت
 
+@bot.callback_query_handler(func=lambda call: call.data.startswith("video_"))
+def handle_video_choice(call):
+    index = int(call.data.split("_")[1])
+    chat_id = call.message.chat.id
+    video_data = bot.results[chat_id][index]
+    video_url = f"https://www.youtube.com{video_data['url_suffix']}"
+    video_thumbnail = video_data['thumbnails'][0]
+
+    if f'message_{chat_id}' in bot.results:
+        bot.delete_message(chat_id, bot.results[f'message_{chat_id}'])
+
+    thumbnail_response = requests.get(video_thumbnail)
+    thumbnail_filename = f"{chat_id}_thumbnail.jpg"
+    with open(thumbnail_filename, 'wb') as file:
+        file.write(thumbnail_response.content)
+
+    markup = telebot.types.InlineKeyboardMarkup()
+    btn_audio = telebot.types.InlineKeyboardButton("ملف صوتي 🎵", callback_data=f"audio_{index}")
+    btn_voice = telebot.types.InlineKeyboardButton("تسجيل صوتي 🎤", callback_data=f"voice_{index}")
+    btn_back = telebot.types.InlineKeyboardButton("عودة ↩️", callback_data=f"back_to_results")
+    markup.add(btn_audio, btn_voice)
+    markup.add(btn_back)
+
+    with open(thumbnail_filename, 'rb') as thumb:
+        sent_msg = bot.send_photo(chat_id, thumb, caption="<b>كيف تريد تحميل المقطع؟</b>", reply_markup=markup, parse_mode='HTML')
+
+    bot.results[f'message_{chat_id}'] = sent_msg.message_id
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith(("audio_", "voice_")))
 def handle_download_choice(call):
     index = int(call.data.split("_")[1])
     chat_id = call.message.chat.id
@@ -132,6 +141,9 @@ def handle_download_choice(call):
         bot.delete_message(chat_id, bot.results[f'message_{chat_id}'])
 
     output_filename = f"{video_title}.mp3"
+
+    # تحديد الحد الأقصى لحجم الملف (50 ميجا)
+    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 ميجا بايت
     
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -176,6 +188,50 @@ def handle_download_choice(call):
         logging.error(f"خطأ أثناء تحميل المقطع: {str(e)}")
         bot.send_message(chat_id, f"<b>حدث خطأ أثناء تحميل المقطع:</b> <code>{str(e)}</code>", parse_mode='HTML')
 
+def send_audio_via_requests(chat_id, audio_file, caption, thumbnail_file):
+    url = f"https://api.telegram.org/bot{API_TOKEN}/sendAudio"
+    with open(audio_file, 'rb') as file_data, open(thumbnail_file, 'rb') as thumb_data:
+        response = requests.post(url, data={'chat_id': chat_id, 'caption': caption}, 
+                                 files={'audio': file_data, 'thumb': thumb_data})
+    return response.json()
+
+def send_voice_via_requests(chat_id, voice_file, caption):
+    url = f"https://api.telegram.org/bot{API_TOKEN}/sendVoice"
+    with open(voice_file, 'rb') as file_data:
+        response = requests.post(url, data={'chat_id': chat_id, 'caption': caption}, 
+                                 files={'voice': file_data})
+    return response.json()
+
+@bot.callback_query_handler(func=lambda call: call.data == "back_to_results")
+def return_to_results(call):
+    chat_id = call.message.chat.id
+    if f'message_{chat_id}' in bot.results:
+        bot.delete_message(chat_id, bot.results[f'message_{chat_id}'])
+    
+    results = bot.results.get(chat_id)
+    if results:
+        markup = telebot.types.InlineKeyboardMarkup()
+        for idx, result in enumerate(results):
+            title = result['title']
+            button = telebot.types.InlineKeyboardButton(title, callback_data=f"video_{idx}")
+            markup.add(button)
+        
+        sent_msg = bot.send_message(chat_id, "<b>اختر المقطع:</b>", reply_markup=markup, parse_mode='HTML')
+        bot.results[f'message_{chat_id}'] = sent_msg.message_id
+
+# تشغيل الخادم مع دعم الخيوط المتعددة
+class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    pass
+
+def run_server():
+    handler = http.server.SimpleHTTPRequestHandler
+    with ThreadedTCPServer(("", 8000), handler) as httpd:
+        logging.info("Serving on port 8000")
+        httpd.serve_forever()
+
+# تشغيل الخادم في خيط جديد
+server_thread = threading.Thread(target=run_server)
+server_thread.start()
 
 # استمرارية تشغيل البوت مع معالجة الأخطاء
 def start_bot():
@@ -184,83 +240,7 @@ def start_bot():
             bot.polling(none_stop=True)
         except Exception as e:
             logging.error(f"خطأ غير متوقع: {str(e)}")
-            bot.send_message(developer_id, f"⚠️ حدث خطأ في البوت:\n<code>{str(e)}</code>", parse_mode='HTML')
             time.sleep(5)  # الانتظار قليلاً قبل إعادة التشغيل
-
-# البحث في YouTube مع معالجة الأخطاء
-def perform_search(call, search_term, searching_msg):
-    try:
-        results = YoutubeSearch(search_term, max_results=5).to_dict()
-        markup = telebot.types.InlineKeyboardMarkup()
-
-        for idx, result in enumerate(results):
-            title = result['title']
-            button = telebot.types.InlineKeyboardButton(title, callback_data=f"video_{idx}")
-            markup.add(button)
-
-        bot.results[call.message.chat.id] = results
-        sent_msg = bot.send_message(call.message.chat.id, f"<b>تم البحث عن:</b> <code>{search_term}</code> 🔦", reply_markup=markup, parse_mode='HTML')
-        
-        bot.delete_message(call.message.chat.id, searching_msg.message_id)
-        bot.results[f'message_{call.message.chat.id}'] = sent_msg.message_id
-    
-    except Exception as e:
-        logging.error(f"خطأ أثناء البحث: {str(e)}")
-        bot.send_message(call.message.chat.id, f"<b>حدث خطأ أثناء البحث:</b> <code>{str(e)}</code>", parse_mode='HTML')
-
-# تحميل الملفات مع معالجة الأخطاء
-def handle_download_choice(call):
-    try:
-        index = int(call.data.split("_")[1])
-        chat_id = call.message.chat.id
-        video_data = bot.results[chat_id][index]
-        video_url = f"https://www.youtube.com{video_data['url_suffix']}"
-        video_title = video_data['title'].replace("|", "-").replace(" ", "_")
-        video_thumbnail = video_data['thumbnails'][0]
-
-        if f'message_{chat_id}' in bot.results:
-            bot.delete_message(chat_id, bot.results[f'message_{chat_id}'])
-
-        output_filename = f"{video_title}.mp3"
-        
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'noplaylist': True,
-            'extractaudio': True,
-            'audioformat': 'mp3',
-            'outtmpl': output_filename,
-            'quiet': True,
-            'cookiefile': 'cookies.txt',
-        }
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(video_url, download=False)
-            file_size = info.get('filesize', 0)
-
-            if file_size and file_size > MAX_FILE_SIZE:
-                bot.send_message(chat_id, f"<b>عذراً، حجم الملف يتجاوز 50 ميجا ولا يمكن تحميله.</b>", parse_mode='HTML')
-                return
-
-            bot.send_message(chat_id, "<b>جاري تحميل المقطع...</b>", parse_mode='HTML')
-            ydl.download([video_url])
-
-        thumbnail_response = requests.get(video_thumbnail)
-        thumbnail_filename = f"{chat_id}_voice_thumbnail.jpg"
-        with open(thumbnail_filename, 'wb') as file:
-            file.write(thumbnail_response.content)
-
-        caption = f"⌔╎البحث: {video_data['title']}"
-        if call.data.startswith("audio_"):
-            send_audio_via_requests(chat_id, output_filename, caption, thumbnail_filename)
-        elif call.data.startswith("voice_"):
-            send_voice_via_requests(chat_id, output_filename, caption)
-
-        os.remove(output_filename)
-        os.remove(thumbnail_filename)
-
-    except Exception as e:
-        logging.error(f"خطأ أثناء تحميل المقطع: {str(e)}")
-        bot.send_message(call.message.chat.id, f"<b>حدث خطأ أثناء تحميل المقطع:</b> <code>{str(e)}</code>", parse_mode='HTML')
 
 # بدء البوت
 start_bot()
