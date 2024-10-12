@@ -3,6 +3,9 @@ from youtube_search import YoutubeSearch
 import requests
 import os
 import yt_dlp
+import http.server
+import socketserver
+import threading
 
 API_TOKEN = '7512265911:AAGGHa_stp4gHj8PCs-yj7gwjTFAguPby7A'
 bot = telebot.TeleBot(API_TOKEN)
@@ -12,6 +15,9 @@ bot.results = {}
 bot.users = set()
 
 developer_id = 5683930416  # ID المطور
+
+# إعداد الكوكيز (يجب أن يكون لديك ملف cookies.txt في نفس مسار السكربت)
+COOKIES_FILE = 'cookies.txt'
 
 # عند بداية البوت
 @bot.message_handler(commands=['start'])
@@ -134,6 +140,7 @@ def handle_download_choice(call):
         'audioformat': 'mp3',
         'outtmpl': output_filename,
         'quiet': True,
+        'cookiefile': COOKIES_FILE,  # استخدام الكوكيز
     }
 
     try:
@@ -191,4 +198,16 @@ def return_to_results(call):
         sent_msg = bot.send_message(chat_id, "<b>اختر المقطع:</b>", reply_markup=markup, parse_mode='HTML')
         bot.results[f'message_{chat_id}'] = sent_msg.message_id
 
+# تشغيل الخادم على منفذ 8000
+def run_server():
+    handler = http.server.SimpleHTTPRequestHandler
+    with socketserver.TCPServer(("", 8000), handler) as httpd:
+        print("Serving on port 8000")
+        httpd.serve_forever()
+
+# تشغيل الخادم في خيط جديد
+server_thread = threading.Thread(target=run_server)
+server_thread.start()
+
 bot.polling()
+ 
