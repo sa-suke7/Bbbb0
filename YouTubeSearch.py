@@ -16,9 +16,6 @@ bot.users = set()
 
 developer_id = 5683930416  # ID المطور
 
-# إعداد الكوكيز (يجب أن يكون لديك ملف cookies.txt في نفس مسار السكربت)
-COOKIES_FILE = 'cookies.txt'
-
 # عند بداية البوت
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -133,6 +130,14 @@ def handle_download_choice(call):
         bot.delete_message(chat_id, bot.results[f'message_{chat_id}'])
 
     output_filename = f"{video_title}.mp3"
+    
+    # قراءة الكوكيز من متغير البيئة
+    cookies_string = os.environ.get('YOUTUBE_COOKIES')
+
+    # إذا كنت بحاجة إلى كتابة الكوكيز إلى ملف مؤقت
+    with open('cookies.txt', 'w') as f:
+        f.write(cookies_string)
+
     ydl_opts = {
         'format': 'bestaudio/best',
         'noplaylist': True,
@@ -140,7 +145,7 @@ def handle_download_choice(call):
         'audioformat': 'mp3',
         'outtmpl': output_filename,
         'quiet': True,
-        'cookiefile': COOKIES_FILE,  # استخدام الكوكيز
+        'cookiefile': 'cookies.txt',  # استخدام الكوكيز
     }
 
     try:
@@ -210,4 +215,3 @@ server_thread = threading.Thread(target=run_server)
 server_thread.start()
 
 bot.polling()
- 
