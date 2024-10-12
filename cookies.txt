@@ -1,5 +1,3 @@
-# Netscape HTTP Cookie File
-# http://curl.haxx.se/rfc/cookie_spec.html
 .youtube.com    TRUE    /   FALSE  0   YSC     D3qL--y4VsI
 .youtube.com    TRUE    /   FALSE  0   SID     g.a000pAh4ctgHKhFHO9HvomV3hfExoSUs6XzNLO9vBHnKIUAXZAQ8GV1XyjJgEvHf6233RFHysgACgYKAa0SARISFQHGX2MiwOfHcSgFtZOezm1tUuxZyhoVAUF8yKoqcUX-_ef4VwIeQvq-X9vx0076
 .youtube.com    TRUE    /   FALSE  0   __Secure-1PSID     g.a000pAh4ctgHKhFHO9HvomV3hfExoSUs6XzNLO9vBHnKIUAXZAQ8LZq38AbByJLSDhW3IxnnYAACgYKASsSARISFQHGX2MioJCkuxUKcDqY6SAY8I0wDxoVAUF8yKpu8PVE6dXb1Enf3MrIeQvF0076
