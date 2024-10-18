@@ -208,4 +208,9 @@ def run_server():
 server_thread = threading.Thread(target=run_server)
 server_thread.start()
 
-bot.polling()
+while True:
+    try:
+        bot.polling(none_stop=True)
+    except Exception as e:
+        print(f"Error occurred: {e}")
+        continue
