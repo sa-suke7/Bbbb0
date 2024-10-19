@@ -10,61 +10,63 @@ import threading
 API_TOKEN = '7512265911:AAGGHa_stp4gHj8PCs-yj7gwjTFAguPby7A'
 bot = telebot.TeleBot(API_TOKEN)
 
-# تخزين النتائج للمستخدمين
+# تخزين نتائج البحث مؤقتاً
 bot.results = {}
 bot.users = set()
 
 developer_id = 5683930416  # ID المطور
 
-# بدء البوت
+# عند بداية البوت
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
     user_info = message.from_user
-    user_username = f"@{user_info.username}" if user_info.username else "غير متوفر"
+    user_username = f"@{user_info.username}" if user_info.username else "لا يوجد"
     
-    # رسالة ترحيبية للمطور
+    # رسالة ترحيب خاصة بالمطور
     if chat_id == developer_id:
         markup = telebot.types.InlineKeyboardMarkup()
-        broadcast_button = telebot.types.InlineKeyboardButton("إرسال رسالة", callback_data="broadcast")
+        broadcast_button = telebot.types.InlineKeyboardButton("إذاعة 📢", callback_data="broadcast")
         markup.add(broadcast_button)
-        bot.send_message(chat_id, "<b>• مرحبا بك في بوت البحث عن الفيديوهات</b>", reply_markup=markup, parse_mode='HTML')
+        bot.send_message(chat_id, "<b>• مرحبا عزيزي المطور يمكنك في اوامر البوت الخاص بك عن طريق الازرار التالية 🦾</b>", reply_markup=markup, parse_mode='HTML')
     else:
-        # رسالة ترحيبية للمستخدمين
+        # تغيير رسالة الترحيب
         welcome_message = (
-            f"مرحبا بك {user_username} \n"
-            f"استخدم بوت البحث عن يوتيوب.\n"
-            "استمتع!"
+            f"↯︙اهلاً بك عزيزي {user_username} ↫\n"
+            f"↯︙في بوت Youtube Search.\n"
+            "↯︙ارسل ما تريد البحث عنه."
         )
         markup = telebot.types.InlineKeyboardMarkup()
-        world_eren_button = telebot.types.InlineKeyboardButton("WORLD EREN", url="https://t.me/ERENYA0")
+        world_eren_button = telebot.types.InlineKeyboardButton("⦗ WORLD EREN ⦘", url="https://t.me/ERENYA0")
         markup.add(world_eren_button)
         
         bot.send_message(chat_id, welcome_message, reply_markup=markup, parse_mode='HTML')
 
-    # تسجيل المستخدمين
+    # إضافة المستخدم إلى القائمة وإبلاغ المطور
     if chat_id not in bot.users:
         bot.users.add(chat_id)
         user_name = user_info.first_name
         user_id = user_info.id
         total_users = len(bot.users)
 
-        # إعلام المطور بتسجيل مستخدم جديد
-        bot.send_message(developer_id, f"مستخدم جديد:\n"
-        f"• الاسم: <code>{user_name}</code>\n"
-        f"• معرف المستخدم: {user_username}\n"
-        f"• ID: <code>{user_id}</code>\n"
-        f"• العدد الكلي للمستخدمين: {total_users}", parse_mode='HTML')
+        # رسالة الإبلاغ للمطور
+        bot.send_message(developer_id, f"٭ تم دخول شخص جديد الى البوت الخاص بك 👾\n"
+        "-----------------------\n"
+        f"• الاسم : <code>{user_name}</code>\n"
+        f"• المعرف : {user_username}\n"
+        f"• الايدي : <code>{user_id}</code>\n"
+        "-----------------------\n"
+        f"• عدد الاعضاء الكلي : {total_users}", parse_mode='HTML')
 
 # البحث عن الفيديوهات
 @bot.message_handler(func=lambda message: True)
 def search_song(message):
     search_term = message.text
     markup = telebot.types.InlineKeyboardMarkup()
-    search_button = telebot.types.InlineKeyboardButton("بحث", callback_data=f"search_{search_term}")
+    search_button = telebot.types.InlineKeyboardButton("ابحث 🔦", callback_data=f"search_{search_term}")
     markup.add(search_button)
 
-    bot.send_message(message.chat.id, f"جاري البحث عن: <code>{search_term}</code>", reply_markup=markup, parse_mode='HTML')
+    bot.send_message(message.chat.id, f"اضغط \"ابحث 🔦\" للبحث عن:\n⏺: <code>{search_term}</code>", reply_markup=markup, parse_mode='HTML')
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("search_"))
 def handle_search(call):
@@ -82,7 +84,7 @@ def handle_search(call):
         markup.add(button)
 
     bot.results[call.message.chat.id] = results
-    sent_msg = bot.send_message(call.message.chat.id, f"<b>نتائج البحث عن:</b> <code>{search_term}</code>", reply_markup=markup, parse_mode='HTML')
+    sent_msg = bot.send_message(call.message.chat.id, f"<b>تم البحث عن:</b> <code>{search_term}</code> 🔦", reply_markup=markup, parse_mode='HTML')
     
     bot.delete_message(call.message.chat.id, searching_msg.message_id)
     bot.results[f'message_{call.message.chat.id}'] = sent_msg.message_id
@@ -104,14 +106,14 @@ def handle_video_choice(call):
         file.write(thumbnail_response.content)
 
     markup = telebot.types.InlineKeyboardMarkup()
-    btn_audio = telebot.types.InlineKeyboardButton("تحميل صوت", callback_data=f"audio_{index}")
-    btn_voice = telebot.types.InlineKeyboardButton("تحميل صوت مع التعليق", callback_data=f"voice_{index}")
-    btn_back = telebot.types.InlineKeyboardButton("العودة للنتائج", callback_data=f"back_to_results")
+    btn_audio = telebot.types.InlineKeyboardButton("ملف صوتي 🎵", callback_data=f"audio_{index}")
+    btn_voice = telebot.types.InlineKeyboardButton("تسجيل صوتي 🎤", callback_data=f"voice_{index}")
+    btn_back = telebot.types.InlineKeyboardButton("عودة ↩️", callback_data=f"back_to_results")
     markup.add(btn_audio, btn_voice)
     markup.add(btn_back)
 
     with open(thumbnail_filename, 'rb') as thumb:
-        sent_msg = bot.send_photo(chat_id, thumb, caption="<b>اختر تحميل الفيديو</b>", reply_markup=markup, parse_mode='HTML')
+        sent_msg = bot.send_photo(chat_id, thumb, caption="<b>كيف تريد تحميل المقطع؟</b>", reply_markup=markup, parse_mode='HTML')
 
     bot.results[f'message_{chat_id}'] = sent_msg.message_id
 
@@ -129,7 +131,8 @@ def handle_download_choice(call):
 
     output_filename = f"{video_title}.mp3"
     
-    # استخدام ملف الكوكيز
+    # إعدادات yt-dlp باستخدام البروكسي
+    proxy = "http://cloudflare.com.nokia.com.ir.co.uk.do_yo.want_to.with.this.www.microsoft.hbhb-h0hb.sbs.:7443"
     ydl_opts = {
         'format': 'bestaudio/best',
         'noplaylist': True,
@@ -137,11 +140,11 @@ def handle_download_choice(call):
         'audioformat': 'mp3',
         'outtmpl': output_filename,
         'quiet': True,
-        'cookiefile': 'cookies.txt',  # استخدام ملف الكوكيز
+        'proxy': proxy,  # إعداد البروكسي هنا
     }
 
     try:
-        loading_msg = bot.send_message(chat_id, "<b>جاري التحميل...</b>", parse_mode='HTML')
+        loading_msg = bot.send_message(chat_id, "<b>جاري تحميل المقطع...</b>", parse_mode='HTML')
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([video_url])
@@ -151,7 +154,7 @@ def handle_download_choice(call):
         with open(thumbnail_filename, 'wb') as file:
             file.write(thumbnail_response.content)
 
-        caption = f"تحميل: {video_data['title']}"
+        caption = f"⌔╎البحث: {video_data['title']}"
         if call.data.startswith("audio_"):
             send_audio_via_requests(chat_id, output_filename, caption, thumbnail_filename)
         elif call.data.startswith("voice_"):
@@ -162,7 +165,7 @@ def handle_download_choice(call):
         bot.delete_message(chat_id, loading_msg.message_id)
 
     except Exception as e:
-        bot.send_message(chat_id, f"<b>حدث خطأ أثناء التحميل:</b> <code>{str(e)}</code>", parse_mode='HTML')
+        bot.send_message(chat_id, f"<b>حدث خطأ أثناء تحميل المقطع:</b> <code>{str(e)}</code>", parse_mode='HTML')
 
 def send_audio_via_requests(chat_id, audio_file, caption, thumbnail_file):
     url = f"https://api.telegram.org/bot{API_TOKEN}/sendAudio"
@@ -192,17 +195,17 @@ def return_to_results(call):
             button = telebot.types.InlineKeyboardButton(title, callback_data=f"video_{idx}")
             markup.add(button)
         
-        sent_msg = bot.send_message(chat_id, "<b>الرجاء اختيار فيديو:</b>", reply_markup=markup, parse_mode='HTML')
+        sent_msg = bot.send_message(chat_id, "<b>اختر المقطع:</b>", reply_markup=markup, parse_mode='HTML')
         bot.results[f'message_{chat_id}'] = sent_msg.message_id
 
-# تشغيل الخادم المحلي على المنفذ 8000
+# تشغيل الخادم على منفذ 8000
 def run_server():
     handler = http.server.SimpleHTTPRequestHandler
     with socketserver.TCPServer(("", 8000), handler) as httpd:
         print("Serving on port 8000")
         httpd.serve_forever()
 
-# بدء الخادم في خيط منفصل
+# تشغيل الخادم في خيط جديد
 server_thread = threading.Thread(target=run_server)
 server_thread.start()
 
