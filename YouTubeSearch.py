@@ -7,7 +7,7 @@ import http.server
 import socketserver
 import threading
 
-API_TOKEN = '7512265911:AAGGHa_stp4gHj8PCs-yj7gwjTFAguPby7A'
+API_TOKEN = os.getenv('API_TOKEN')
 bot = telebot.TeleBot(API_TOKEN)
 
 # تخزين نتائج البحث مؤقتاً
