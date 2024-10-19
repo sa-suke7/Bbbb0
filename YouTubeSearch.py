@@ -132,16 +132,14 @@ def handle_download_choice(call):
     output_filename = f"{video_title}.mp3"
     
     # إعدادات yt-dlp باستخدام البروكسي
-    proxy = "http://cloudflare.com.nokia.com.ir.co.uk.do_yo.want_to.with.this.www.microsoft.hbhb-h0hb.sbs.:7443"
     ydl_opts = {
-        'format': 'bestaudio/best',
-        'noplaylist': True,
-        'extractaudio': True,
-        'audioformat': 'mp3',
-        'outtmpl': output_filename,
-        'quiet': True,
-        'proxy': proxy,  # إعداد البروكسي هنا
-    }
+    'proxy': 'http://web.counterfilter.net:443',
+    'format': 'bestaudio/best',
+    'extractaudio': True,
+    'audioformat': 'mp3',
+    'outtmpl': '%(title)s.%(ext)s',
+}
+
 
     try:
         loading_msg = bot.send_message(chat_id, "<b>جاري تحميل المقطع...</b>", parse_mode='HTML')
