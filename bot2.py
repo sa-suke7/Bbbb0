@@ -4,6 +4,7 @@ import re
 import asyncio
 from datetime import datetime
 import json
+import os
 
 # قراءة القيم من متغيرات البيئة
 API_ID = int(os.getenv('API_ID'))
