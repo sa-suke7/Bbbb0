@@ -5,16 +5,17 @@ import asyncio
 from datetime import datetime
 import json
 import os
+import http.server
+import socketserver
 
 # قراءة القيم من متغيرات البيئة
 API_ID = int(os.getenv('API_ID'))
 API_HASH = os.getenv('API_HASH')
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-developer_id = int(os.getenv('developer_id'))
+developer_id = int(os.getenv('DEVELOPER_ID'))
 
 # إنشاء عميل Telethon
 client = TelegramClient('bot_session', API_ID, API_HASH)
-
 
 # تحميل أو إنشاء ملف المستخدمين
 def load_users():
@@ -157,20 +158,19 @@ async def handler(event):
             await event.reply("⚠️ <b>يرجى إدخال رابط صحيح لمنشور من قناة مقيدة.</b>", parse_mode='html')
 
 # تشغيل الخادم على منفذ 8000
-def run_server():
+async def run_server():
     handler = http.server.SimpleHTTPRequestHandler
     with socketserver.TCPServer(("", 8000), handler) as httpd:
         print("Serving on port 8000")
-        httpd.serve_forever()            
-                        
-                                                
+        httpd.serve_forever()
 
 # بدء تشغيل البوت
-while True:
-    try:
-        client.start(bot_token=BOT_TOKEN)
-        print("Bot started successfully")
-        client.run_until_disconnected()
-    except Exception as e:
-        print(f"Error occurred: {e}")
-        continue
+async def main():
+    await client.start(bot_token=BOT_TOKEN)
+    print("Bot started successfully")
+    
+    # تشغيل الخادم مع البوت
+    await asyncio.gather(client.run_until_disconnected(), run_server())
+
+if __name__ == "__main__":
+    asyncio.run(main())
