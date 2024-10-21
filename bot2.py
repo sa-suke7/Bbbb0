@@ -11,7 +11,7 @@ import socketserver
 # قراءة القيم من متغيرات البيئة
 API_ID = "29984076"
 API_HASH = "be3aaeef107fa2578ee47271b4aa5645"
-BOT_TOKEN = int(os.getenv('BOT_TOKEN')
+BOT_TOKEN = "8180921666:AAF4quZ0ta7GZIhvux-eZPfWaWPSh6Qqifo"
 developer_id = int(os.getenv('DEVELOPER_ID'))
 
 # إنشاء عميل Telethon
