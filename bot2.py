@@ -9,8 +9,8 @@ import http.server
 import socketserver
 
 # قراءة القيم من متغيرات البيئة
-API_ID = int(os.getenv('API_ID'))
-API_HASH = os.getenv('API_HASH')
+API_ID = "29984076"
+API_HASH = "be3aaeef107fa2578ee47271b4aa5645"
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 developer_id = int(os.getenv('DEVELOPER_ID'))
 
