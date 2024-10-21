@@ -1,4 +1,2 @@
-pyTelegramBotAPI
-youtube-search
-requests
-yt-dlp
+telethon
+asyncio
