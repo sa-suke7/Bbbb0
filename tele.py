@@ -1,17 +1,46 @@
 import time
 import telebot
 import requests
+import json
 import http.server
 import socketserver
 import threading
 import os
-
 # ضع هنا توكن البوت الخاص بك
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 CHANNEL_USERNAME = '@EREN_PYTHON'  # ضع هنا اسم المستخدم لقناتك
 
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
+
+# ملف لتخزين عدد الأشخاص الذين تفاعلوا مع البوت
+used_bot_file = "used_bot.json"
+user_count_file = "user_count.json"
+
+def load_used_users():
+    try:
+        with open(used_bot_file, "r") as file:
+            return json.load(file)
+    except FileNotFoundError:
+        return {}
+
+def save_used_users(users):
+    with open(used_bot_file, "w") as file:
+        json.dump(users, file)
+
+def load_user_count():
+    try:
+        with open(user_count_file, "r") as file:
+            return json.load(file)
+    except FileNotFoundError:
+        return {"count": 0}
+
+def save_user_count(count):
+    with open(user_count_file, "w") as file:
+        json.dump({"count": count}, file)
+
+used_users = load_used_users()
+user_count = load_user_count()
 
 def check_subscription(chat_id):
     # التحقق من حالة الاشتراك في القناة
@@ -21,6 +50,8 @@ def check_subscription(chat_id):
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     chat_id = message.chat.id
+    user_id = message.from_user.id
+
     if check_subscription(chat_id):
         # إذا كان المستخدم مشتركًا، أرسل رسالة الترحيب
         user_link = f"<a href='tg://user?id={message.from_user.id}'>{message.from_user.first_name}</a>"
@@ -33,9 +64,33 @@ def send_welcome(message):
                          f"↯︙في بوت رفع الصور.\n"
                          f"↯︙ارسل الصورة وسأرسل لك رابط لها.",
                          reply_markup=markup, parse_mode="HTML")
+        
+        # إرسال رسالة للمطورين عند دخول عضو جديد لأول مرة
+        if user_id not in used_users:
+            send_new_member_info(message)
+            used_users[user_id] = message.from_user.first_name
+            save_used_users(used_users)
+            
+            # تحديث العدد الكلي للأعضاء الذين تفاعلوا مع البوت
+            user_count["count"] += 1
+            save_user_count(user_count["count"])
     else:
         # إذا لم يكن مشتركًا، أظهر رسالة الاشتراك
         send_subscription_prompt(chat_id)
+
+def send_new_member_info(message):
+    # إرسال معلومات العضو الجديد للمطورين
+    developers = [6091548061, 5683930416]  # IDs المطورين
+    for dev in developers:
+        bot.send_message(dev, 
+                         f"٭ تم دخول شخص جديد إلى البوت الخاص بك 👾\n"
+                         f"-----------------------\n"
+                         f"• معلومات العضو الجديد.\n"
+                         f"• الاسم : {message.from_user.first_name}\n"
+                         f"• معرف : @{message.from_user.username if message.from_user.username else 'لا يوجد'}\n"
+                         f"• الايدي : {message.from_user.id}\n"
+                         f"-----------------------\n"
+                         f"• عدد الأعضاء الكلي : {user_count['count']}")
 
 def send_subscription_prompt(chat_id):
     # رسالة الاشتراك الإجباري
@@ -69,6 +124,9 @@ def verify_subscription(call):
                          f"↯︙في بوت رفع الصور.\n"
                          f"↯︙ارسل الصورة وسأرسل لك رابط لها.",
                          reply_markup=markup, parse_mode="HTML")
+        
+        # إرسال رسالة للمطورين عند التحقق من الاشتراك
+        send_new_member_info(call.message)
     else:
         # إظهار رسالة عدم الاشتراك للمستخدم في نافذة منبثقة
         bot.answer_callback_query(call.id, "عذراً، لم تشترك في القناة بعد.", show_alert=True)
@@ -131,7 +189,7 @@ def upload_image_callback(call):
     else:
         # في حالة حدوث خطأ أثناء الرفع
         bot.send_message(call.message.chat.id, "حدث خطأ أثناء رفع الصورة. حاول مرة أخرى لاحقًا.")
-        
+
 def run_server():
     handler = http.server.SimpleHTTPRequestHandler
     with socketserver.TCPServer(("", 8000), handler) as httpd:
@@ -141,11 +199,13 @@ def run_server():
 # تشغيل الخادم في خيط جديد
 server_thread = threading.Thread(target=run_server)
 server_thread.start()	                
+        
+                        
 
 # تكرار المحاولة في حال حدوث خطأ
 while True:
     try:
         bot.polling()
     except Exception as e:
-        print(f"حدث خطأ: {e}. إعادة تشغيل البوت...")
-        time.sleep(5)  # الانتظار لمدة 5 ثوانٍ قبل إعادة التشغيل
+        print(f"Error: {e}")
+        time.sleep(15)
