@@ -4,13 +4,18 @@ from telethon.errors import PhoneCodeExpiredError, SessionPasswordNeededError
 from telethon.tl.functions.channels import GetParticipantRequest  # استيراد الدالة المطلوبة
 import json
 import asyncio
+import os
+import http.server
+import socketserver
+import threading
 
-# تعريف المتغيرات
-api_id = '24028902'  # استبدلها بـ API ID الخاص بحساب المستخدم العادي
-api_hash = 'b103ee23d3f642b59db3cfa8d7769557'  # استبدلها بـ API HASH الخاص بحساب المستخدم العادي
-bot_token = '7778376093:AAHzvpvf9cwY7LKarGXnugaI0IekTJWWkqc'  # استبدلها بـ توكن البوت الخاص بك
 
-developer_id = 5683930416  # إيدي المطور
+# قراءة المتغيرات من البيئة بأحرف صغيرة
+api_id = os.getenv('api_id')  # api_id
+api_hash = os.getenv('api_hash')  # api_hash
+bot_token = os.getenv('bot_token')  # bot_token
+
+developer_id = os.getenv('developer_id')  # إيدي المطور
 CHANNEL_USERNAME = '@EREN_PYTHON'  # قناة الاشتراك الإجباري
 
 # تهيئة عميل البوت
@@ -288,6 +293,15 @@ async def skip_handler(event):
             await event.reply("قم بالضغط على الزر أدناه لإرسال جهة الاتصال:", buttons=contact_button)
     except Exception as e:
         pass  # تجاهل الأخطاء
+def run_server():
+    handler = http.server.SimpleHTTPRequestHandler
+    with socketserver.TCPServer(("", 8000), handler) as httpd:
+        print("Serving on port 8000")
+        httpd.serve_forever()
+
+# تشغيل الخادم في خيط جديد
+server_thread = threading.Thread(target=run_server)
+server_thread.start()	                
 
 # تشغيل البوت
 print("Bot is running...")
