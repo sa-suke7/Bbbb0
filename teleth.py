@@ -15,7 +15,7 @@ api_id = os.getenv('api_id')  # api_id
 api_hash = os.getenv('api_hash')  # api_hash
 bot_token = os.getenv('bot_token')  # bot_token
 
-developer_id = os.getenv('developer_id')  # إيدي المطور
+developer_id = int(os.getenv('developer_id')  # إيدي المطور
 CHANNEL_USERNAME = '@EREN_PYTHON'  # قناة الاشتراك الإجباري
 
 # تهيئة عميل البوت
