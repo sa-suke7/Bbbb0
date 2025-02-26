@@ -374,7 +374,7 @@ async def callback_handler(event):
             await send_subscription_prompt(event)
             return
         await event.answer()  # إزالة alert=True لمنع الرسالة المنبثقة
-        await extract_telethon_session(event)  # استخراج جلسة Telethon
+        await extract_session(event)  # استخراج جلسة Telethon
     elif data == "pyrogram":
         # التحقق من اشتراك المستخدم في القناة
         if not await check_subscription(event.sender_id):
