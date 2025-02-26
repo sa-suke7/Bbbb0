@@ -8,7 +8,9 @@ import os
 import asyncio
 import time  # لإصلاح مشكلة تزامن الوقت
 from telethon import Button, events
-
+import http.server
+import socketserver
+import threading
 api_id = os.getenv('api_id')  # api_id
 api_hash = os.getenv('api_hash')  # api_hash
 bot_token = os.getenv('bot_token') # bot_token
