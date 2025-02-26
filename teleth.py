@@ -7,10 +7,6 @@ import json
 import asyncio
 import time  # لإصلاح مشكلة تزامن الوقت
 from telethon import Button, events
-import os
-import http.server
-import socketserver
-import threading
 
 api_id = os.getenv('api_id')  # api_id
 api_hash = os.getenv('api_hash')  # api_hash
@@ -140,153 +136,58 @@ async def start(event):
 
     await event.reply(welcome_message, buttons=buttons)
 
-# دالة لاستخراج جلسة Telethon
-async def extract_telethon_session(event):
+async def extract_pyrogram_session(event):
     sender = await event.get_sender()
     sender_id = str(sender.id)
 
     async with bot.conversation(event.sender_id) as conv:
         try:
-            await conv.send_message("- حسنـا قم بـ إرسـال كـود الـ (آيبي ايدي - ᴀᴩɪ_ɪᴅ) الان 🏷\n\n- او اضغط /skip لـ المواصلـه عبـر ايبيات البـوت التلقائيـه 🪁")
+            await conv.send_message("- حسنـاً .. عـزيـزي 🙋🏻‍♀\n- قم بـ إرسـال كـود الـ (آيبي ايدي - ᴀᴩɪ_ɪᴅ) الان 🏷\n\n- او اضغط /skip لـ المواصلـه عبـر ايبيات البـوت التلقائيـه 🪁")
             api_id_msg = await conv.get_response()
             if api_id_msg.text == '/skip':
                 api_id = '24028902'
                 api_hash = 'b103ee23d3f642b59db3cfa8d7769557'
+            elif api_id_msg.text == '/cancel':
+                await conv.send_message("» تم الالغـاء ...\n» ارسـل  /start  لـ البـدء مـن جديـد")
+                return
             else:
                 api_id = api_id_msg.text
-                await conv.send_message("- حسنـا قم بـ إرسـال كـود الـ (آيبي هاش - ᴀᴩɪ_ʜᴀsʜ) الان 🏷\n\n- او اضغط /cancel لـ الالغـاء")
+                await conv.send_message("- حسنـاً .. عـزيـزي 🙋🏻‍♀\n- قم بـ إرسـال كـود الـ (آيبي هاش - ᴀᴩɪ_ʜᴀsʜ) الان 🏷\n\n- او اضغط /cancel لـ الالغـاء")
                 api_hash_msg = await conv.get_response()
                 if api_hash_msg.text == '/cancel':
                     await conv.send_message("» تم الالغـاء ...\n» ارسـل  /start  لـ البـدء مـن جديـد")
                     return
                 api_hash = api_hash_msg.text
 
-            # إرسال رسالة مع زر لإرسال جهة الاتصال
-            contact_button = [[Button.request_phone("إرسال جهة الاتصال", resize=True, single_use=True)]]
-            await conv.send_message("- قم بالضغـط ع زر ارسـال جهـة الاتصـال\n- او إرسـال رقـم الهاتـف مع مفتـاح الدولـة\n- مثال : +967777117888", buttons=contact_button)
+            await conv.send_message("- قم بـ إرسـال رقـم الهاتـف مع مفتـاح الدولـة\n- مثال : +967777117888")
             phone_number_msg = await conv.get_response()
             if phone_number_msg.text == '/cancel':
                 await conv.send_message("» تم الالغـاء ...\n» ارسـل  /start  لـ البـدء مـن جديـد")
                 return
-            phone_number = phone_number_msg.text if not phone_number_msg.contact else phone_number_msg.contact.phone_number
+            phone_number = phone_number_msg.text
 
-            # إرسال رسالة "جاري إرسال كود الدخول ⎙...."
-            sending_code_msg = await conv.send_message("**جـاري ارسـال كـود الدخـول ⎙....**")
+            # إنشاء عميل Pyrogram
+            pyro_client = Client(":memory:", api_id=api_id, api_hash=api_hash)
 
-            # بدء عملية تسجيل الدخول
-            client = TelegramClient(StringSession(), api_id, api_hash)
-            await client.connect()
-            if not await client.is_user_authorized():
-                await client.send_code_request(phone_number)
-                await sending_code_msg.delete()  # حذف الرسالة بعد إرسال الكود
-                code_message = await conv.send_message("- قم بـ ارسـال الكود الذي وصل اليك من الشركة\n\n- اضغـط الـزر بالاسفـل لـ الذهاب لـ اشعـارات Telegram", buttons=[[Button.url("إضغط هنا", "tg://openmessage?user_id=777000")]])
-                verification_code_msg = await conv.get_response()
-                if verification_code_msg.text == '/cancel':
-                    await conv.send_message("» تم الالغـاء ...\n» ارسـل  /start  لـ البـدء مـن جديـد")
-                    return
-                verification_code = verification_code_msg.text
+            await pyro_client.connect()
+            await conv.send_message("**جـاري ارسـال كـود الدخـول ⎙....**")
+            sent_code = await pyro_client.send_code(phone_number)
 
-                try:
-                    await client.sign_in(phone_number, verification_code)
-                except PhoneCodeExpiredError:
-                    await conv.send_message("☆ ✖️ انتهت صلاحية الكود. حاول مرة أخرى.")
-                    return
-                except SessionPasswordNeededError:
-                    await conv.send_message("- قـم بادخـال كلمـة مـرور حسابـك ( التحقق بـ خطوتين ).\n- بــدون مســافـات")
-                    password_msg = await conv.get_response()
-                    if password_msg.text == '/cancel':
-                        await conv.send_message("» تم الالغـاء ...\n» ارسـل  /start  لـ البـدء مـن جديـد")
-                        return
-                    password = password_msg.text
-                    await client.sign_in(password=password)
-
-            # إرسال رسالة جاري إنشاء الجلسة
-            creating_session_msg = await conv.send_message("**جـارِ إنشـاء جلسـة البـوت ⌬ . . .**")
-            await asyncio.sleep(2)  # انتظار لمدة 2 ثواني
-            await creating_session_msg.delete()  # حذف الرسالة بعد الانتهاء
-
-            # حفظ الجلسة واسم المستخدم
-            session_str = client.session.save()
-            user = await client.get_me()  # الحصول على معلومات الحساب
-            user_accounts[sender_id]["sessions"].append(session_str)
-            user_accounts[sender_id]["users"].append(f"{user.id} - {user.first_name}")  # حفظ ID واسم المستخدم
-
-            # تخزين الجلسات في ملف
-            save_data()
-
-            # إرسال الجلسة للمستخدم في الرسائل المحفوظة
-            await client.send_message('me', f"**تم استخـراج كـود جلسـة Telethon .. بنجـاح ✅**\n\n```{session_str}```")
-
-            # إرسال رسالة تأكيد للمستخدم مع زر للانتقال إلى الرسائل المحفوظة
             await conv.send_message(
-                f"**تم استخـراج كـود جلسـة Telethon .. بنجـاح ✅**\n\n"
-                "**تم ارسـال الكـود لحافظـة حسـابـك للامـان 😇**\n\n"
-                "**اضغـط الـزر بالاسفـل للانتقـال لحافظـة حسابك**",
-                buttons=[[Button.url("إضغط هنا", f"tg://openmessage?user_id={sender_id}")]]
+                "- قم بـ ارسـال الكود الذي وصل اليك من الشركة **مع مسافات** مثال: 1 2 3 4 5\n\n"
+                "- اضغـط الـزر بالاسفـل لـ الذهاب لـ اشعـارات Telegram",
+                buttons=[[Button.url("إضغط هنا", "tg://openmessage?user_id=777000")]]
             )
-
-        except asyncio.TimeoutError:
-            await event.reply("**عـذراً .. لقـد انتهـى الوقت**\n**ارسـل  /start  لـ البـدء مـن جديـد**")
-        except Exception as e:
-            await conv.send_message(f"**☆ ❌ حدث خطأ: {str(e)}**")
-
-# دالة لاستخراج جلسة Pyrogram
-
-async def extract_telethon_session(event):
-    sender = await event.get_sender()
-    sender_id = str(sender.id)
-
-    async with bot.conversation(event.sender_id) as conv:
-        try:
-            await conv.send_message("- حسنـا قم بـ إرسـال كـود الـ (آيبي ايدي - ᴀᴩɪ_ɪᴅ) الان 🏷\n\n- او اضغط /skip لـ المواصلـه عبـر ايبيات البـوت التلقائيـه 🪁")
-            api_id_msg = await conv.get_response()
-            if api_id_msg.text == '/skip':
-                api_id = '24028902'
-                api_hash = 'b103ee23d3f642b59db3cfa8d7769557'
-            else:
-                api_id = api_id_msg.text
-                await conv.send_message("- حسنـا قم بـ إرسـال كـود الـ (آيبي هاش - ᴀᴩɪ_ʜᴀsʜ) الان 🏷\n\n- او اضغط /cancel لـ الالغـاء")
-                api_hash_msg = await conv.get_response()
-                if api_hash_msg.text == '/cancel':
-                    await conv.send_message("» تم الالغـاء ...\n» ارسـل  /start  لـ البـدء مـن جديـد")
-                    return
-                api_hash = api_hash_msg.text
-
-            # إرسال رسالة مع زر لإرسال جهة الاتصال
-            contact_button = [[Button.request_phone("إرسال جهة الاتصال", resize=True, single_use=True)]]
-            await conv.send_message("- قم بالضغـط ع زر ارسـال جهـة الاتصـال\n- او إرسـال رقـم الهاتـف مع مفتـاح الدولـة\n- مثال : +967777117888", buttons=contact_button)
-            phone_number_msg = await conv.get_response()
-            if phone_number_msg.text == '/cancel':
+            code_msg = await conv.get_response()
+            if code_msg.text == '/cancel':
                 await conv.send_message("» تم الالغـاء ...\n» ارسـل  /start  لـ البـدء مـن جديـد")
                 return
-            phone_number = phone_number_msg.text if not phone_number_msg.contact else phone_number_msg.contact.phone_number
+            code = code_msg.text
 
-            # إرسال رسالة "جاري إرسال كود الدخول ⎙...."
-            sending_code_msg = await conv.send_message("**جـاري ارسـال كـود الدخـول ⎙....**")
-
-            # بدء عملية تسجيل الدخول
-            client = TelegramClient(StringSession(), api_id, api_hash)
-            await client.connect()
-            if not await client.is_user_authorized():
-                await client.send_code_request(phone_number)
-                await sending_code_msg.delete()  # حذف الرسالة بعد إرسال الكود
-                code_message = await conv.send_message(
-                    "- قم بـ ارسـال الكود الذي وصل اليك من الشركة **مع مسافات** مثال: 1 2 3 4 5\n\n"
-                    "- اضغـط الـزر بالاسفـل لـ الذهاب لـ اشعـارات Telegram",
-                    buttons=[[Button.url("إضغط هنا", "tg://openmessage?user_id=777000")]]
-                )
-                verification_code_msg = await conv.get_response()
-                if verification_code_msg.text == '/cancel':
-                    await conv.send_message("» تم الالغـاء ...\n» ارسـل  /start  لـ البـدء مـن جديـد")
-                    return
-                verification_code = verification_code_msg.text
-
-                try:
-                    await client.sign_in(phone_number, verification_code)
-                except PhoneCodeExpiredError:
-                    await conv.send_message("☆ ✖️ انتهت صلاحية الكود. حاول مرة أخرى.")
-                    return
-                except SessionPasswordNeededError:
+            try:
+                await pyro_client.sign_in(phone_number, sent_code.phone_code_hash, code)
+            except Exception as e:
+                if "SESSION_PASSWORD_NEEDED" in str(e):
                     await conv.send_message(
                         "- قـم بادخـال كلمـة مـرور حسابـك ( التحقق بـ خطوتين ).\n"
                         "- بــدون مســافـات"
@@ -296,32 +197,128 @@ async def extract_telethon_session(event):
                         await conv.send_message("» تم الالغـاء ...\n» ارسـل  /start  لـ البـدء مـن جديـد")
                         return
                     password = password_msg.text
-                    await client.sign_in(password=password)
+                    await pyro_client.check_password(password)
+                else:
+                    await conv.send_message(f"**حدث خطأ أثناء تسجيل الدخول: {str(e)}**")
+                    return
 
             # إرسال رسالة جاري إنشاء الجلسة
             creating_session_msg = await conv.send_message("**جـارِ إنشـاء جلسـة البـوت ⌬ . . .**")
             await asyncio.sleep(2)  # انتظار لمدة 2 ثواني
             await creating_session_msg.delete()  # حذف الرسالة بعد الانتهاء
 
-            # حفظ الجلسة واسم المستخدم
-            session_str = client.session.save()
-            user = await client.get_me()  # الحصول على معلومات الحساب
-            user_accounts[sender_id]["sessions"].append(session_str)
-            user_accounts[sender_id]["users"].append(f"{user.id} - {user.first_name}")  # حفظ ID واسم المستخدم
+            # استخراج جلسة Pyrogram
+            session_string = await pyro_client.export_session_string()
 
-            # تخزين الجلسات في ملف
-            save_data()
-
-            # إرسال الجلسة للمستخدم في الرسائل المحفوظة
-            await client.send_message('me', f"**تم استخـراج كـود جلسـة Telethon .. بنجـاح ✅**\n\n```{session_str}```")
+            # إرسال الجلسة إلى الرسائل المحفوظة
+            await pyro_client.send_message("me", f"**تم استخـراج كـود جلسـة Pyrogram .. بنجـاح ✅**\n\n```{session_string}```")
 
             # إرسال رسالة تأكيد للمستخدم مع زر للانتقال إلى الرسائل المحفوظة
             await conv.send_message(
-                f"**تم استخـراج كـود جلسـة Telethon .. بنجـاح ✅**\n\n"
+                "**تم استخـراج كـود جلسـة Pyrogram .. بنجـاح ✅**\n\n"
                 "**تم ارسـال الكـود لحافظـة حسـابـك للامـان 😇**\n\n"
                 "**اضغـط الـزر بالاسفـل للانتقـال لحافظـة حسابك**",
-                buttons=[[Button.url("إضغط هنا", f"tg://openmessage?user_id={sender_id}")]]
+                buttons=[[Button.url("اضغط هنا", f"tg://openmessage?user_id={sender_id}")]]
             )
+
+            await pyro_client.disconnect()
+
+        except Exception as e:
+            await conv.send_message(f"**☆ ❌ حدث خطأ: {str(e)}**")
+
+        except asyncio.TimeoutError:
+            await event.reply("**عـذراً .. لقـد انتهـى الوقت**\n**ارسـل  /start  لـ البـدء مـن جديـد**")
+        except Exception as e:
+            await conv.send_message(f"**☆ ❌ حدث خطأ: {str(e)}**")
+async def extract_pyrogram_session(event):
+    sender = await event.get_sender()
+    sender_id = str(sender.id)
+
+    async with bot.conversation(event.sender_id) as conv:
+        try:
+            await conv.send_message("- حسنـاً .. عـزيـزي 🙋🏻‍♀\n- قم بـ إرسـال كـود الـ (آيبي ايدي - ᴀᴩɪ_ɪᴅ) الان 🏷\n\n- او اضغط /skip لـ المواصلـه عبـر ايبيات البـوت التلقائيـه 🪁")
+            api_id_msg = await conv.get_response()
+            if api_id_msg.text == '/skip':
+                api_id = '24028902'
+                api_hash = 'b103ee23d3f642b59db3cfa8d7769557'
+            elif api_id_msg.text == '/cancel':
+                await conv.send_message("» تم الالغـاء ...\n» ارسـل  /start  لـ البـدء مـن جديـد")
+                return
+            else:
+                api_id = api_id_msg.text
+                await conv.send_message("- حسنـاً .. عـزيـزي 🙋🏻‍♀\n- قم بـ إرسـال كـود الـ (آيبي هاش - ᴀᴩɪ_ʜᴀsʜ) الان 🏷\n\n- او اضغط /cancel لـ الالغـاء")
+                api_hash_msg = await conv.get_response()
+                if api_hash_msg.text == '/cancel':
+                    await conv.send_message("» تم الالغـاء ...\n» ارسـل  /start  لـ البـدء مـن جديـد")
+                    return
+                api_hash = api_hash_msg.text
+
+            await conv.send_message("- قم بـ إرسـال رقـم الهاتـف مع مفتـاح الدولـة\n- مثال : +967777117888")
+            phone_number_msg = await conv.get_response()
+            if phone_number_msg.text == '/cancel':
+                await conv.send_message("» تم الالغـاء ...\n» ارسـل  /start  لـ البـدء مـن جديـد")
+                return
+            phone_number = phone_number_msg.text
+
+            # إنشاء عميل Pyrogram
+            pyro_client = Client(":memory:", api_id=api_id, api_hash=api_hash)
+
+            await pyro_client.connect()
+            await conv.send_message("**جـاري ارسـال كـود الدخـول ⎙....**")
+            sent_code = await pyro_client.send_code(phone_number)
+
+            await conv.send_message(
+                "- قم بـ ارسـال الكود الذي وصل اليك من الشركة **مع مسافات** مثال: 1 2 3 4 5\n\n"
+                "- اضغـط الـزر بالاسفـل لـ الذهاب لـ اشعـارات Telegram",
+                buttons=[[Button.url("إضغط هنا", "tg://openmessage?user_id=777000")]]
+            )
+            code_msg = await conv.get_response()
+            if code_msg.text == '/cancel':
+                await conv.send_message("» تم الالغـاء ...\n» ارسـل  /start  لـ البـدء مـن جديـد")
+                return
+            code = code_msg.text
+
+            try:
+                await pyro_client.sign_in(phone_number, sent_code.phone_code_hash, code)
+            except Exception as e:
+                if "SESSION_PASSWORD_NEEDED" in str(e):
+                    await conv.send_message(
+                        "- قـم بادخـال كلمـة مـرور حسابـك ( التحقق بـ خطوتين ).\n"
+                        "- بــدون مســافـات"
+                    )
+                    password_msg = await conv.get_response()
+                    if password_msg.text == '/cancel':
+                        await conv.send_message("» تم الالغـاء ...\n» ارسـل  /start  لـ البـدء مـن جديـد")
+                        return
+                    password = password_msg.text
+                    await pyro_client.check_password(password)
+                else:
+                    await conv.send_message(f"**حدث خطأ أثناء تسجيل الدخول: {str(e)}**")
+                    return
+
+            # إرسال رسالة جاري إنشاء الجلسة
+            creating_session_msg = await conv.send_message("**جـارِ إنشـاء جلسـة البـوت ⌬ . . .**")
+            await asyncio.sleep(2)  # انتظار لمدة 2 ثواني
+            await creating_session_msg.delete()  # حذف الرسالة بعد الانتهاء
+
+            # استخراج جلسة Pyrogram
+            session_string = await pyro_client.export_session_string()
+
+            # إرسال الجلسة إلى الرسائل المحفوظة
+            await pyro_client.send_message("me", f"**تم استخـراج كـود جلسـة ᴩʏʀᴏɢʀᴀᴍ .. بنجـاح ✅**\n\n```{session_string}```")
+
+            # إرسال رسالة تأكيد للمستخدم مع زر للانتقال إلى الرسائل المحفوظة
+            await conv.send_message(         "**تم استخـراج كـود جلسـة ᴩʏʀᴏɢʀᴀᴍ .. بنجـاح ✅**\n\n"
+                "**تم ارسـال الكـود لحافظـة حسـابـك للامـان 😇**\n\n"
+                "**اضغـط الـزر بالاسفـل للانتقـال لحافظـة حسابك**",
+                buttons=[[Button.url("اضغط هنا", f"tg://openmessage?user_id={sender_id}")]]
+            )
+
+            await pyro_client.disconnect()
+
+        except Exception as e:
+            await conv.send_message(f"**☆ ❌ حدث خطأ: {str(e)}**")            
+
 # دالة لتحويل الجلسات
 async def convert_session(event):
     sender = await event.get_sender()
@@ -400,7 +397,7 @@ async def convert_pyrogram(event):
             except Exception as e:
                 await conv.send_message(f"**عذراً، الجلسة المرسلة غير صالحة**")
         except Exception as e:
-            await conv.send_message(f"**☆ ❌ حدث خطأ: {str(e)}**")
+            await conv.send_message(f"**☆ ❌ حدث خطأ: {str(e)}**") 
 
 # معالجة الضغط على الأزرار
 @bot.on(events.CallbackQuery)
