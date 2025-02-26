@@ -4,6 +4,7 @@ from telethon.errors import PhoneCodeExpiredError, SessionPasswordNeededError
 from telethon.tl.functions.channels import GetParticipantRequest
 from pyrogram import Client  # إضافة مكتبة Pyrogram
 import json
+import os
 import asyncio
 import time  # لإصلاح مشكلة تزامن الوقت
 from telethon import Button, events
