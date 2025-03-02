@@ -1,1 +1,1 @@
-web: python teleth.py
+web: python control.py
