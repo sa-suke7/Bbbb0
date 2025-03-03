@@ -2021,107 +2021,10 @@ async def transfer_points(sender_id, account_index, target_id, conv, retry_count
         await client.disconnect()
 
 
-@bot.on(events.CallbackQuery(pattern='view_story'))
-async def view_story(event):
-    sender_id = str(event.sender_id)
-    username = f"@{event.sender.username}" if event.sender.username else sender_id  
-    
-    if sender_id != str(owner_id) and (sender_id not in allowed_users and username not in allowed_users):
-        await event.respond("🚫 أنت غير مسموح لك باستخدام هذا الخيار. لتفعيل البوت تواصل مع المطور.")
-        return
-    
-    # التحقق إذا كان لدى المستخدم حسابات مسجلة
-    if sender_id not in user_accounts or not user_accounts[sender_id]["sessions"]:
-        await event.respond("🚫 لا توجد حسابات مسجلة لديك.")
-        return
-
-    async with bot.conversation(event.sender_id) as conv:
-        try:
-            # طلب رابط الاستوري
-            await conv.send_message("♢ أرسل رابط الاستوري الذي تريد مشاهدته (مثال: https://t.me/username/s/12345):")
-            story_link = (await conv.get_response()).text.strip()
-
-            # استخراج معرف المستخدم ورقم الاستوري من الرابط
-            try:
-                if "t.me" in story_link:
-                    parts = story_link.split("/")
-                    if len(parts) >= 4 and parts[-2] == 's':
-                        username = parts[-3]  # اسم المستخدم أو القناة
-                        story_id = int(parts[-1])  # رقم الاستوري
-                    else:
-                        await conv.send_message("❌ الرابط غير صالح. يرجى إرسال رابط استوري صحيح.")
-                        return
-                else:
-                    await conv.send_message("❌ الرابط غير صالح. يرجى إرسال رابط من Telegram.")
-                    return
-            except ValueError:
-                await conv.send_message("❌ الرابط غير صالح. تأكد من أن الرابط يحتوي على رقم استوري صحيح.")
-                return
-
-            # طلب عدد الحسابات أو النطاق
-            max_accounts = len(user_accounts[sender_id]["sessions"])
-            await conv.send_message(f"♢ كم عدد الحسابات التي تريد استخدامها للمشاهدة؟ (الحد الأقصى {max_accounts}):\n\nيمكنك إدخال نطاق مثل 10-20 لبدء المشاهدة من الحساب رقم 10 إلى الحساب رقم 20.")
-            account_input = (await conv.get_response()).text.strip()
-
-            # تحليل النطاق إذا كان المدخل يحتوي على "-"
-            if '-' in account_input:
-                start, end = map(int, account_input.split('-'))
-                account_indices = list(range(start - 1, end))  # تحويل إلى مؤشرات (تبدأ من 0)
-            else:
-                account_count = int(account_input)
-                account_indices = list(range(min(account_count, max_accounts)))
-
-            # تنفيذ عملية مشاهدة الاستوري بشكل متزامن
-            async def view_story_with_account(session_str, account_number):
-                client = TelegramClient(StringSession(session_str), api_id, api_hash)
-                await client.connect()
-
-                try:
-                    # إضافة فترة انتظار بين الطلبات
-                    await asyncio.sleep(2)  # انتظار 2 ثانية بين الطلبات
-
-                    # الحصول على كيان المستخدم أو القناة
-                    entity = await client.get_entity(username)
-
-                    # مشاهدة الاستوري
-                    await client(functions.stories.ViewStoriesRequest(
-                        peer=entity,
-                        id=[story_id]  # استخدام رقم الاستوري
-                    ))
-
-                    await conv.send_message(f"✅ تمت مشاهدة الاستوري باستخدام الحساب رقم {account_number}.")
-                    return True
-                except PeerIdInvalidError:
-                    await conv.send_message(f"❌ الحساب رقم {account_number}: لا يمكن العثور على القناة أو المستخدم.")
-                except ChatWriteForbiddenError:
-                    await conv.send_message(f"❌ الحساب رقم {account_number}: لا يمكن مشاهدة الاستوري في هذه القناة (قد تكون القناة خاصة أو محظورة).")
-                except FloodWaitError as e:
-                    await conv.send_message(f"❌ الحساب رقم {account_number}: يجب الانتظار {e.seconds} ثانية قبل المحاولة مرة أخرى.")
-                except Exception as e:
-                    await conv.send_message(f"❌ حدث خطأ باستخدام الحساب رقم {account_number}: {str(e)}")
-                finally:
-                    await client.disconnect()
-
-                return False
-
-            # إنشاء قائمة بالمهام (tasks) لكل حساب
-            tasks = [
-                view_story_with_account(user_accounts[sender_id]["sessions"][i], i + 1)
-                for i in account_indices
-            ]
-
-            # تنفيذ المهام بشكل متزامن
-            results = await asyncio.gather(*tasks)
-
-            # حساب عدد المشاهدات الناجحة
-            successful_views = sum(results)
-            await conv.send_message(f"✅ تم الانتهاء من عملية مشاهدة الاستوري بنجاح. عدد المشاهدات الناجحة: {successful_views}.")
-        except Exception as e:
-            await conv.send_message(f"❌ حدث خطأ أثناء مشاهدة الاستوري: {str(e)}")
 
 
                                                 
-  @bot.on(events.CallbackQuery(pattern='gift'))
+@bot.on(events.CallbackQuery(pattern='gift'))
 async def collect_gift(event):
     sender_id = str(event.sender_id)
     username = f"@{event.sender.username}" if event.sender.username else sender_id  
