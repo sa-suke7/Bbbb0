@@ -1777,7 +1777,12 @@ async def view_story(event):
             await conv.send_message(f"✅ تم الانتهاء من عملية مشاهدة الاستوري بنجاح. عدد المشاهدات الناجحة: {successful_views}.")
         except Exception as e:
             await conv.send_message(f"❌ حدث خطأ أثناء مشاهدة الاستوري: {str(e)}")
-                        
+
+
+                                                
+                                                                        
+
+
 @bot.on(events.CallbackQuery(pattern='collect'))
 async def collect_points(event):
     sender_id = str(event.sender_id)
@@ -1981,8 +1986,6 @@ async def collect_points_for_account(sender_id, account_index, conv, retry_count
     finally:
         await client.disconnect()
 
-
-
 @bot.on(events.CallbackQuery(pattern='transfer'))
 async def collect_gift(event):
     sender_id = str(event.sender_id)
@@ -2031,8 +2034,8 @@ async def collect_gift(event):
                     else:
                         success_reports.append(f"✅ **الحساب رقم {idx + 1}:** تم تحويل {result} نقطة بنجاح.")
 
-                # انتظار 10 ثواني بين كل دفعة
-                await asyncio.sleep(10)
+                # انتظار 15 ثانية بين كل دفعة
+                await asyncio.sleep(15)
 
             # إرسال التقرير النهائي
             report = "📊 **تقرير تحويل النقاط:**\n\n"
@@ -2053,7 +2056,7 @@ async def transfer_points(sender_id, account_index, target_id, conv, retry_count
             try:
                 # إرسال /start إلى بوت @DamKombot
                 await client.send_message('@DamKombot', '/start')
-                await asyncio.sleep(3)  # انتظار 3 ثواني
+                await asyncio.sleep(5)  # انتظار 5 ثواني
 
                 # الحصول على آخر رسالة من البوت
                 messages = await client.get_messages('@DamKombot', limit=1)
@@ -2070,13 +2073,21 @@ async def transfer_points(sender_id, account_index, target_id, conv, retry_count
                                     if link:
                                         channel_username = link.group(0)
                                         # الاشتراك في القناة
-                                        await client(JoinChannelRequest(channel_username))
-                                        await conv.send_message(f"✅ **الحساب رقم {account_index + 1} اشترك في قناة الإشتراك الاجباري {channel_username}.**")
-                                        await asyncio.sleep(10)  # زيادة وقت الانتظار إلى 10 ثواني
+                                        try:
+                                            await client(JoinChannelRequest(channel_username))
+                                            await conv.send_message(f"✅ **الحساب رقم {account_index + 1} اشترك في قناة الإشتراك الاجباري {channel_username}.**")
+                                            await asyncio.sleep(10)  # زيادة وقت الانتظار إلى 10 ثواني
+                                        except FloodWaitError as e:
+                                            await conv.send_message(f"⏳ **يلزم الانتظار {e.seconds} ثانية قبل المحاولة مرة أخرى.**")
+                                            await asyncio.sleep(e.seconds)  # الانتظار للفترة المطلوبة
+                                            await client(JoinChannelRequest(channel_username))
+                                        except Exception as e:
+                                            await conv.send_message(f"❌ **حدث خطأ أثناء الاشتراك في القناة {channel_username}: {str(e)}**")
 
                 # إعادة إرسال /start بعد الاشتراك في القنوات
                 await client.send_message('@DamKombot', '/start')
-                await asyncio.sleep(3)  # انتظار 3 ثواني
+                await asyncio.sleep(5)  # انتظار 5 ثواني
+
                 # إرسال إخطار للمستخدم ببدء تحويل النقاط
                 await conv.send_message(f"✅ **بدأ تحويل النقاط في الحساب رقم {account_index + 1}...**")
 
@@ -2096,21 +2107,21 @@ async def transfer_points(sender_id, account_index, target_id, conv, retry_count
 
                         # الضغط على زر "تحويل نقاط ♻️""
                         await messages[0].click(text="تحويل نقاط ♻️")
-                        await asyncio.sleep(3)  # انتظار 3 ثواني
+                        await asyncio.sleep(5)  # انتظار 5 ثواني
 
                         # الحصول على آخر رسالة من البوت بعد الضغط على زر التجميع
                         messages = await client.get_messages('@DamKombot', limit=1)
                         if messages and hasattr(messages[0], 'text') and "🔢) اختر طريقة التحويل :" in messages[0].text:
                             # الضغط على زر "التحويل الى ايدي 👤""
                             await messages[0].click(text="التحويل الى ايدي 👤")
-                            await asyncio.sleep(3)  # انتظار 3 ثواني
+                            await asyncio.sleep(5)  # انتظار 5 ثواني
 
                             # الحصول على آخر رسالة من البوت بعد الضغط على زر التحويل الى ايدي 👤
                             messages = await client.get_messages('@DamKombot', limit=1)
                             if messages and hasattr(messages[0], 'text') and "🔢 ارسل ايدي الشخص :" in messages[0].text:
                                 # إرسال الأيدي الذي تم الحصول عليه من المستخدم
                                 await client.send_message('@DamKombot', target_id)
-                                await asyncio.sleep(3)  # انتظار 3 ثواني
+                                await asyncio.sleep(5)  # انتظار 5 ثواني
 
                                 # الحصول على آخر رسالة من البوت بعد إرسال الأيدي
                                 messages = await client.get_messages('@DamKombot', limit=1)
@@ -2134,8 +2145,7 @@ async def transfer_points(sender_id, account_index, target_id, conv, retry_count
         raise e  # رفع الخطأ لتسجيله في التقرير
 
     finally:
-        await client.disconnect()
-
+        await client.disconnect()                
 
 @bot.on(events.CallbackQuery(pattern='gift'))
 async def collect_gift(event):
@@ -2181,8 +2191,8 @@ async def collect_gift(event):
                     else:
                         success_reports.append(f"✅ **الحساب رقم {idx + 1}:** تم جمع الهدية بنجاح.")
 
-                # انتظار 10 ثواني بين كل دفعة
-                await asyncio.sleep(10)
+                # انتظار 15 ثانية بين كل دفعة
+                await asyncio.sleep(15)
 
             # إرسال التقرير النهائي
             report = "📊 **تقرير تجميع الهدايا:**\n\n"
@@ -2203,7 +2213,7 @@ async def collect_gift_for_account(sender_id, account_index, conv, retry_count=3
             try:
                 # إرسال /start إلى بوت @DamKombot
                 await client.send_message('@DamKombot', '/start')
-                await asyncio.sleep(3)  # انتظار 3 ثواني
+                await asyncio.sleep(5)  # انتظار 5 ثواني
 
                 # الحصول على آخر رسالة من البوت
                 messages = await client.get_messages('@DamKombot', limit=1)
@@ -2220,13 +2230,21 @@ async def collect_gift_for_account(sender_id, account_index, conv, retry_count=3
                                     if link:
                                         channel_username = link.group(0)
                                         # الاشتراك في القناة
-                                        await client(JoinChannelRequest(channel_username))
-                                        await conv.send_message(f"✅ **الحساب رقم {account_index + 1} اشترك في قناة الإشتراك الاجباري {channel_username}.**")
-                                        await asyncio.sleep(10)  # زيادة وقت الانتظار إلى 10 ثواني
+                                        try:
+                                            await client(JoinChannelRequest(channel_username))
+                                            await conv.send_message(f"✅ **الحساب رقم {account_index + 1} اشترك في قناة الإشتراك الاجباري {channel_username}.**")
+                                            await asyncio.sleep(10)  # زيادة وقت الانتظار إلى 10 ثواني
+                                        except FloodWaitError as e:
+                                            await conv.send_message(f"⏳ **يلزم الانتظار {e.seconds} ثانية قبل المحاولة مرة أخرى.**")
+                                            await asyncio.sleep(e.seconds)  # الانتظار للفترة المطلوبة
+                                            await client(JoinChannelRequest(channel_username))
+                                        except Exception as e:
+                                            await conv.send_message(f"❌ **حدث خطأ أثناء الاشتراك في القناة {channel_username}: {str(e)}**")
 
                 # إعادة إرسال /start بعد الاشتراك في القنوات
                 await client.send_message('@DamKombot', '/start')
-                await asyncio.sleep(3)  # انتظار 3 ثواني
+                await asyncio.sleep(5)  # انتظار 5 ثواني
+
                 # إرسال إخطار للمستخدم ببدء تجميع الهدية
                 await conv.send_message(f"✅ **بدأ تجميع الهدية في الحساب رقم {account_index + 1}...**")
 
@@ -2235,14 +2253,14 @@ async def collect_gift_for_account(sender_id, account_index, conv, retry_count=3
                 if messages and hasattr(messages[0], 'text') and "نقاطك" in messages[0].text:
                     # الضغط على زر "تجميع ✳️"
                     await messages[0].click(text="تجميع ✳️")
-                    await asyncio.sleep(3)  # انتظار 3 ثواني
+                    await asyncio.sleep(5)  # انتظار 5 ثواني
 
                     # الحصول على آخر رسالة من البوت بعد الضغط على زر التجميع
                     messages = await client.get_messages('@DamKombot', limit=1)
                     if messages and hasattr(messages[0], 'text') and "✳️ تجميع نقاط" in messages[0].text:
                         # الضغط على زر "الهدية 🎁"
                         await messages[0].click(text="الهدية 🎁")
-                        await asyncio.sleep(3)  # انتظار 3 ثواني
+                        await asyncio.sleep(5)  # انتظار 5 ثواني
 
                         # الحصول على آخر رسالة من البوت بعد الضغط على زر الهدية
                         messages = await client.get_messages('@DamKombot', limit=1)
@@ -2252,7 +2270,7 @@ async def collect_gift_for_account(sender_id, account_index, conv, retry_count=3
                                 await conv.send_message(f"✅ **تم جمع الهدية في الحساب رقم {account_index + 1}.**")
                                 # إرسال /start لإيقاف العملية
                                 await client.send_message('@DamKombot', '/start')
-                                await asyncio.sleep(3)  # انتظار 3 ثواني
+                                await asyncio.sleep(5)  # انتظار 5 ثواني
                                 return  # نجاح العملية
                             else:
                                 raise Exception("تم جمع الهدية من قبل.")
@@ -2280,6 +2298,7 @@ async def collect_gift_for_account(sender_id, account_index, conv, retry_count=3
 
     finally:
         await client.disconnect()
+
 
 
 
