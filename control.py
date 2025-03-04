@@ -2092,7 +2092,6 @@ async def transfer_points(sender_id, account_index, target_id, conv, retry_count
         await client.disconnect()
 
 
-
 @bot.on(events.CallbackQuery(pattern='gift'))
 async def collect_gift(event):
     sender_id = str(event.sender_id)
@@ -2145,7 +2144,6 @@ async def collect_gift(event):
 
         except Exception as e:
             await conv.send_message(f"❌ **حدث خطأ أثناء تجميع الهدايا:** {str(e)}")
-
 async def collect_gift_for_account(sender_id, account_index, conv, max_retries=3):
     session_str = user_accounts[sender_id]["sessions"][account_index]
     client = TelegramClient(StringSession(session_str), api_id, api_hash)
@@ -2225,8 +2223,9 @@ async def collect_gift_for_account(sender_id, account_index, conv, max_retries=3
             else:
                 raise e  # رفع الخطأ إذا فشلت جميع المحاولات
 
-    finally:
-        await client.disconnect()
+        finally:
+            await client.disconnect()
+
                                        
 
 @bot.on(events.CallbackQuery(pattern='charge'))  # تعريف الزر بـ use_code
