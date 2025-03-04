@@ -31,16 +31,15 @@ from telethon.errors import FloodWaitError
 import psycopg2
 from psycopg2 import sql
 
+DB_CONFIG = {
+    'dbname': os.getenv('dbname'),
+    'user': os.getenv('user'),
+    'password': os.getenv('password'),
+    'host': os.getenv('host'),
+    'port': os.getenv('port'),
+    'sslmode': os.getenv('sslmode')
+}
 
-   # معلومات الاتصال بقاعدة البيانات من المتغيرات البيئية
-   DB_CONFIG = {
-       'dbname': os.getenv('dbname'),
-       'user': os.getenv('user'),
-       'password': os.getenv('password'),
-       'host': os.getenv('host'),
-       'port': os.getenv('port'),
-       'sslmode': os.getenv('sslmode')
-   }
 
 # الاتصال بقاعدة البيانات
 def get_db_connection():
