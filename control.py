@@ -2098,11 +2098,13 @@ async def transfer_points(sender_id, account_index, target_id, conv, retry_count
         await client.disconnect()
 
 
+# تعريف الحدث لجمع الهدايا
 @bot.on(events.CallbackQuery(pattern='gift'))
 async def collect_gift(event):
     sender_id = str(event.sender_id)
     username = f"@{event.sender.username}" if event.sender.username else sender_id  
     
+    # التحقق من إذن المستخدم
     if sender_id != str(owner_id) and (sender_id not in allowed_users and username not in allowed_users):
         await event.respond("🚫 أنت غير مسموح لك باستخدام هذا الخيار. لتفعيل البوت تواصل مع المطور.")
         return
@@ -2150,6 +2152,8 @@ async def collect_gift(event):
 
         except Exception as e:
             await conv.send_message(f"❌ **حدث خطأ أثناء تجميع الهدايا:** {str(e)}")
+
+# دالة لجمع الهدايا من حساب معين
 async def collect_gift_for_account(sender_id, account_index, conv, max_retries=3):
     session_str = user_accounts[sender_id]["sessions"][account_index]
     client = TelegramClient(StringSession(session_str), api_id, api_hash)
@@ -2221,24 +2225,22 @@ async def collect_gift_for_account(sender_id, account_index, conv, max_retries=3
             else:
                 raise Exception("لم يتم العثور على رسالة النقاط.")
 
-            except FloodWaitError as e:
-                await conv.send_message(f"⏳ **الحساب رقم {account_index + 1}: يلزم الانتظار {e.seconds} ثانية.**")
-                await asyncio.sleep(e.seconds)  # الانتظار للمدة المطلوبة
-                continue  # إعادة المحاولة بعد الانتظار
-            except Exception as e:
-                if attempt < retry_count - 1:
-                    await conv.send_message(f"⚠️ **الحساب رقم {account_index + 1}: إعادة المحاولة ({attempt + 1}/{retry_count}) بسبب: {str(e)}**")
-                    await asyncio.sleep(10)  # زيادة وقت الانتظار
-                    continue
-                else:
-                    raise e  # رفع الخطأ إذا فشلت جميع المحاولات
+        except FloodWaitError as e:
+            await conv.send_message(f"⏳ **الحساب رقم {account_index + 1}: يلزم الانتظار {e.seconds} ثانية.**")
+            await asyncio.sleep(e.seconds)  # الانتظار للمدة المطلوبة
+            retry_count += 1
+            continue  # إعادة المحاولة بعد الانتظار
+        except Exception as e:
+            if retry_count < max_retries - 1:
+                await conv.send_message(f"⚠️ **الحساب رقم {account_index + 1}: إعادة المحاولة ({retry_count + 1}/{max_retries}) بسبب: {str(e)}**")
+                await asyncio.sleep(10)  # زيادة وقت الانتظار
+                retry_count += 1
+                continue
+            else:
+                raise e  # رفع الخطأ إذا فشلت جميع المحاولات
 
-    except Exception as e:
-        raise e  # رفع الخطأ لتسجيله في التقرير
-
-
-        finally:
-            await client.disconnect()
+    finally:
+        await client.disconnect()
 
                                        
 
