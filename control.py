@@ -2098,6 +2098,8 @@ async def transfer_points(sender_id, account_index, target_id, conv, retry_count
         await client.disconnect()
 
 
+
+
 # تعريف الحدث لجمع الهدايا
 @bot.on(events.CallbackQuery(pattern='gift'))
 async def collect_gift(event):
@@ -2239,9 +2241,8 @@ async def collect_gift_for_account(sender_id, account_index, conv, max_retries=3
             else:
                 raise e  # رفع الخطأ إذا فشلت جميع المحاولات
 
-    finally:
-        await client.disconnect()
-
+        finally:
+            await client.disconnect()
                                        
 
 @bot.on(events.CallbackQuery(pattern='charge'))  # تعريف الزر بـ use_code
