@@ -1924,7 +1924,7 @@ async def collect_points_for_account(sender_id, account_index, conv, retry_count
 
             except FloodWaitError as e:
                 await conv.send_message(f"⏳ **الحساب رقم {account_index + 1}: يلزم الانتظار {e.seconds} ثانية.**")
-                await asyncio.sleep(e.seconds)  # الانتظار للمدة المطلوبة
+                await asyncio.sleep(400)  # الانتظار للمدة المطلوبة
                 continue  # إعادة المحاولة بعد الانتظار
             except Exception as e:
                 if attempt < retry_count - 1:
@@ -2080,7 +2080,7 @@ async def transfer_points(sender_id, account_index, target_id, conv, retry_count
 
             except FloodWaitError as e:
                 await conv.send_message(f"⏳ **الحساب رقم {account_index + 1}: يلزم الانتظار {e.seconds} ثانية.**")
-                await asyncio.sleep(e.seconds)  # الانتظار للمدة المطلوبة
+                await asyncio.sleep(400)  # الانتظار للمدة المطلوبة
                 continue  # إعادة المحاولة بعد الانتظار
             except Exception as e:
                 if attempt < retry_count - 1:
@@ -2229,7 +2229,7 @@ async def collect_gift_for_account(sender_id, account_index, conv, max_retries=3
 
         except FloodWaitError as e:
             await conv.send_message(f"⏳ **الحساب رقم {account_index + 1}: يلزم الانتظار {e.seconds} ثانية.**")
-            await asyncio.sleep(e.seconds)  # الانتظار للمدة المطلوبة
+            await asyncio.sleep(400)  # الانتظار للمدة المطلوبة
             retry_count += 1
             continue  # إعادة المحاولة بعد الانتظار
         except Exception as e:
@@ -2380,7 +2380,7 @@ async def use_code_with_account(sender_id, account_index, code, conv, retry_coun
 
             except FloodWaitError as e:
                 await conv.send_message(f"⏳ **الحساب رقم {account_index + 1}: يلزم الانتظار {e.seconds} ثانية.**")
-                await asyncio.sleep(e.seconds)  # الانتظار للمدة المطلوبة
+                await asyncio.sleep(400)  # الانتظار للمدة المطلوبة
                 continue  # إعادة المحاولة بعد الانتظار
             except Exception as e:
                 if attempt < retry_count - 1:
@@ -2512,7 +2512,7 @@ async def check_subscription_for_account(sender_id, account_index, conv, retry_c
 
             except FloodWaitError as e:
                 await conv.send_message(f"⏳ **الحساب رقم {account_index + 1}: يلزم الانتظار {e.seconds} ثانية.**")
-                await asyncio.sleep(e.seconds)  # الانتظار للمدة المطلوبة
+                await asyncio.sleep(400)  # الانتظار للمدة المطلوبة
                 continue  # إعادة المحاولة بعد الانتظار
             except Exception as e:
                 if attempt < retry_count - 1:
