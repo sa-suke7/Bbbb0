@@ -2539,9 +2539,14 @@ server_thread = threading.Thread(target=run_server)
 server_thread.start()	                
 
             
-# تشغيل البوت
-print("Bot is running...")
-bot.run_until_disconnected()                                                                                            
+while True:
+    try:
+        print("Bot is running...")
+        bot.run_until_disconnected()
+    except Exception as e:
+        print(f"Bot stopped due to an error: {e}")
+        print("Restarting the bot in 10 seconds...")
+        time.sleep(10)  # انتظار 10 ثواني قبل إعادة التشغيل
                                                                         
         
                 
