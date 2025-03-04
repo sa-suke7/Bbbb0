@@ -1922,18 +1922,21 @@ async def collect_points_for_account(sender_id, account_index, conv, retry_count
                 await conv.send_message(f"✅ **تم الانتهاء من عملية التجميع في الحساب رقم {account_index + 1}.**")
                 return  # نجاح العملية
 
+            except FloodWaitError as e:
+                await conv.send_message(f"⏳ **الحساب رقم {account_index + 1}: يلزم الانتظار {e.seconds} ثانية.**")
+                await asyncio.sleep(e.seconds)  # الانتظار للمدة المطلوبة
+                continue  # إعادة المحاولة بعد الانتظار
             except Exception as e:
-                if attempt < retry_count - 1:  # إعادة المحاولة إذا لم تكن المحاولة الأخيرة
+                if attempt < retry_count - 1:
                     await conv.send_message(f"⚠️ **الحساب رقم {account_index + 1}: إعادة المحاولة ({attempt + 1}/{retry_count}) بسبب: {str(e)}**")
-                    await client.send_message('@DamKombot', '/start')  # إعادة إرسال /start
-                    await asyncio.sleep(300)  # انتظار 300 ثانية قبل إعادة المحاولة
+                    await asyncio.sleep(10)  # زيادة وقت الانتظار
                     continue
                 else:
                     raise e  # رفع الخطأ إذا فشلت جميع المحاولات
 
     except Exception as e:
         raise e  # رفع الخطأ لتسجيله في التقرير
-
+	
     finally:
         await client.disconnect()
 
@@ -2075,18 +2078,21 @@ async def transfer_points(sender_id, account_index, target_id, conv, retry_count
                                     await asyncio.sleep(30)  # انتظار 30 ثانية بين الطلبات
                                     return points_amount  # إرجاع عدد النقاط المحولة
 
+            except FloodWaitError as e:
+                await conv.send_message(f"⏳ **الحساب رقم {account_index + 1}: يلزم الانتظار {e.seconds} ثانية.**")
+                await asyncio.sleep(e.seconds)  # الانتظار للمدة المطلوبة
+                continue  # إعادة المحاولة بعد الانتظار
             except Exception as e:
-                if attempt < retry_count - 1:  # إعادة المحاولة إذا لم تكن المحاولة الأخيرة
+                if attempt < retry_count - 1:
                     await conv.send_message(f"⚠️ **الحساب رقم {account_index + 1}: إعادة المحاولة ({attempt + 1}/{retry_count}) بسبب: {str(e)}**")
-                    await asyncio.sleep(300)  # انتظار 300 ثانية قبل إعادة المحاولة
-                    await client.send_message('@DamKombot', '/start')  # إعادة إرسال /start
-                    await asyncio.sleep(30)  # انتظار 30 ثانية بين الطلبات
+                    await asyncio.sleep(10)  # زيادة وقت الانتظار
                     continue
                 else:
                     raise e  # رفع الخطأ إذا فشلت جميع المحاولات
 
     except Exception as e:
         raise e  # رفع الخطأ لتسجيله في التقرير
+
 
     finally:
         await client.disconnect()
@@ -2215,13 +2221,21 @@ async def collect_gift_for_account(sender_id, account_index, conv, max_retries=3
             else:
                 raise Exception("لم يتم العثور على رسالة النقاط.")
 
-        except Exception as e:
-            retry_count += 1
-            if retry_count < max_retries:
-                await conv.send_message(f"⚠️ **الحساب رقم {account_index + 1}: إعادة المحاولة ({retry_count}/{max_retries}) بسبب: {str(e)}**")
-                await asyncio.sleep(300)  # انتظار 88 ثانية قبل إعادة المحاولة
-            else:
-                raise e  # رفع الخطأ إذا فشلت جميع المحاولات
+            except FloodWaitError as e:
+                await conv.send_message(f"⏳ **الحساب رقم {account_index + 1}: يلزم الانتظار {e.seconds} ثانية.**")
+                await asyncio.sleep(e.seconds)  # الانتظار للمدة المطلوبة
+                continue  # إعادة المحاولة بعد الانتظار
+            except Exception as e:
+                if attempt < retry_count - 1:
+                    await conv.send_message(f"⚠️ **الحساب رقم {account_index + 1}: إعادة المحاولة ({attempt + 1}/{retry_count}) بسبب: {str(e)}**")
+                    await asyncio.sleep(10)  # زيادة وقت الانتظار
+                    continue
+                else:
+                    raise e  # رفع الخطأ إذا فشلت جميع المحاولات
+
+    except Exception as e:
+        raise e  # رفع الخطأ لتسجيله في التقرير
+
 
         finally:
             await client.disconnect()
@@ -2493,11 +2507,14 @@ async def check_subscription_for_account(sender_id, account_index, conv, retry_c
                 else:
                     raise Exception("لم يتم العثور على الرسالة المتوقعة بعد عدة محاولات.")
 
+            except FloodWaitError as e:
+                await conv.send_message(f"⏳ **الحساب رقم {account_index + 1}: يلزم الانتظار {e.seconds} ثانية.**")
+                await asyncio.sleep(e.seconds)  # الانتظار للمدة المطلوبة
+                continue  # إعادة المحاولة بعد الانتظار
             except Exception as e:
                 if attempt < retry_count - 1:
                     await conv.send_message(f"⚠️ **الحساب رقم {account_index + 1}: إعادة المحاولة ({attempt + 1}/{retry_count}) بسبب: {str(e)}**")
-                    await client.send_message('@DamKombot', '/start')  # إعادة إرسال /start
-                    await asyncio.sleep(10)  # زيادة وقت الانتظار إلى 10 ثواني
+                    await asyncio.sleep(10)  # زيادة وقت الانتظار
                     continue
                 else:
                     raise e  # رفع الخطأ إذا فشلت جميع المحاولات
