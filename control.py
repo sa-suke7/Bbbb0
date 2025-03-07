@@ -110,7 +110,7 @@ async def close_client(session_str):
     """
     if session_str in client_connections:
         await client_connections[session_str].disconnect()
-        del client_connections[session_str
+        del client_connections[session_str]
 
 # تحميل البيانات من قاعدة البيانات
 def load_data():
