@@ -2175,7 +2175,17 @@ async def transfer_points(sender_id, account_index, target_id, conv, retry_count
     finally:
         if client.is_connected():
             await client.disconnect()  # إغلاق الاتصال بعد الانتهاء
-
+@bot.message_handler(commands=['id'])
+def send_user_id(message):
+    user_id = message.from_user.id
+    username = message.from_user.username
+    name = message.from_user.first_name
+    bot.send_message(
+        message.chat.id,
+        f"⌁︙أهـلاً بـك <a href='http://t.me/{username}'>{name}</a>\n⌁︙ال ID الخاص بحسابك هو\n<code>{user_id}</code>",
+        parse_mode='HTML',
+        disable_web_page_preview=True
+    )
 # تعريف الحدث لجمع الهدايا
 @bot.on(events.CallbackQuery(pattern='gift'))
 async def collect_gift(event):
