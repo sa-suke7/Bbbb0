@@ -2063,43 +2063,53 @@ async def collect_gift(event):
 
 async def transfer_points(sender_id, account_index, target_id, conv, retry_count=2):
     session_str = user_accounts[sender_id]["sessions"][account_index]
-    client = await get_client(session_str)
-
+    client = TelegramClient(StringSession(session_str), api_id, api_hash)
+    
     try:
         for attempt in range(retry_count):
             try:
+                # الاتصال بالعميل
+                await client.connect()
+                if not client.is_connected():
+                    raise Exception("فشل في الاتصال بالعميل.")
+
                 # إرسال /start إلى بوت @DamKombot
                 await client.send_message('@DamKombot', '/start')
                 await asyncio.sleep(30)  # انتظار 30 ثانية بين الطلبات
 
                 # الحصول على آخر رسالة من البوت
                 messages = await client.get_messages('@DamKombot', limit=1)
-                if messages and hasattr(messages[0], 'text') and "عليك الاشتراك بالقنوات" in messages[0].text:
-                    # البحث عن الأزرار التي تحتوي على روابط القنوات
+                if not messages or not hasattr(messages[0], 'text'):
+                    raise Exception("لم يتم العثور على رسالة من البوت.")
+
+                # التحقق من اشتراك القنوات الإجبارية
+                if "عليك الاشتراك بالقنوات" in messages[0].text:
                     buttons = messages[0].buttons
                     if buttons:
                         for button_row in buttons:
                             for button in button_row:
-                                # التأكد من أن الزر يحتوي على نص
                                 if hasattr(button, 'text'):
-                                    # استخراج الرابط من الزر (إذا كان يحتوي على @)
                                     link = re.search(r'@(\w+)', button.text)
                                     if link:
                                         channel_username = link.group(0)
-                                        # الاشتراك في القناة
-                                        await client(JoinChannelRequest(channel_username))
-                                        await conv.send_message(f"✅ **الحساب رقم {account_index + 1} اشترك في قناة الإشتراك الاجباري {channel_username}.**")
-                                        await asyncio.sleep(30)  # انتظار 30 ثانية بين الطلبات
+                                        try:
+                                            await client(JoinChannelRequest(channel_username))
+                                            await conv.send_message(f"✅ **الحساب رقم {account_index + 1} اشترك في قناة الإشتراك الاجباري {channel_username}.**")
+                                            await asyncio.sleep(30)  # انتظار 30 ثانية بين الطلبات
+                                        except FloodWaitError as e:
+                                            await conv.send_message(f"⏳ **الحساب رقم {account_index + 1}: يلزم الانتظار {e.seconds} ثانية.**")
+                                            await asyncio.sleep(e.seconds + 5)  # الانتظار للمدة المطلوبة + 5 ثواني إضافية
+                                        except Exception as e:
+                                            await conv.send_message(f"❌ **الحساب رقم {account_index + 1}: حدث خطأ أثناء الاشتراك في القناة {channel_username}: {str(e)}**")
+                        await client.send_message('@DamKombot', '/start')
+                        await asyncio.sleep(30)  # انتظار 30 ثانية بين الطلبات
 
-                # إعادة إرسال /start بعد الاشتراك في القنوات
-                await client.send_message('@DamKombot', '/start')
-                await asyncio.sleep(30)  # انتظار 30 ثانية بين الطلبات
-                # إرسال إخطار للمستخدم ببدء تحويل النقاط
-                await conv.send_message(f"✅ **بدأ تحويل النقاط في الحساب رقم {account_index + 1}...**")
-
-                # الحصول على آخر رسالة من البوت
+                # التحقق من رسالة النقاط
                 messages = await client.get_messages('@DamKombot', limit=1)
-                if messages and hasattr(messages[0], 'text') and "نقاطك" in messages[0].text:
+                if not messages or not hasattr(messages[0], 'text'):
+                    raise Exception("لم يتم العثور على رسالة النقاط.")
+
+                if "نقاطك" in messages[0].text:
                     # استخراج عدد النقاط من الرسالة
                     points_text = messages[0].text
                     points = re.search(r'نقاطك : (\d+)', points_text)
@@ -2111,27 +2121,36 @@ async def transfer_points(sender_id, account_index, target_id, conv, retry_count
                             await conv.send_message(f"🚫 **الحساب رقم {account_index + 1} يحتوي على {points_amount} نقطة فقط. البوت لا يحول أقل من 10 نقاط.**")
                             return  # الانتقال إلى الحساب التالي
 
-                        # الضغط على زر "تحويل نقاط ♻️""
+                        # الضغط على زر "تحويل نقاط ♻️"
                         await messages[0].click(text="تحويل نقاط ♻️")
                         await asyncio.sleep(30)  # انتظار 30 ثانية بين الطلبات
 
                         # الحصول على آخر رسالة من البوت بعد الضغط على زر التجميع
                         messages = await client.get_messages('@DamKombot', limit=1)
-                        if messages and hasattr(messages[0], 'text') and "🔢) اختر طريقة التحويل :" in messages[0].text:
-                            # الضغط على زر "التحويل الى ايدي 👤""
+                        if not messages or not hasattr(messages[0], 'text'):
+                            raise Exception("لم يتم العثور على رسالة بعد التجميع.")
+
+                        if "🔢) اختر طريقة التحويل :" in messages[0].text:
+                            # الضغط على زر "التحويل الى ايدي 👤"
                             await messages[0].click(text="التحويل الى ايدي 👤")
                             await asyncio.sleep(30)  # انتظار 30 ثانية بين الطلبات
 
                             # الحصول على آخر رسالة من البوت بعد الضغط على زر التحويل الى ايدي 👤
                             messages = await client.get_messages('@DamKombot', limit=1)
-                            if messages and hasattr(messages[0], 'text') and "🔢 ارسل ايدي الشخص :" in messages[0].text:
+                            if not messages or not hasattr(messages[0], 'text'):
+                                raise Exception("لم يتم العثور على رسالة بعد الضغط على الزر.")
+
+                            if "🔢 ارسل ايدي الشخص :" in messages[0].text:
                                 # إرسال الأيدي الذي تم الحصول عليه من المستخدم
                                 await client.send_message('@DamKombot', target_id)
                                 await asyncio.sleep(30)  # انتظار 30 ثانية بين الطلبات
 
                                 # الحصول على آخر رسالة من البوت بعد إرسال الأيدي
                                 messages = await client.get_messages('@DamKombot', limit=1)
-                                if messages and hasattr(messages[0], 'text') and "💳 ارسل الكمية :" in messages[0].text:
+                                if not messages or not hasattr(messages[0], 'text'):
+                                    raise Exception("لم يتم العثور على رسالة بعد إرسال الأيدي.")
+
+                                if "💳 ارسل الكمية :" in messages[0].text:
                                     # إرسال عدد النقاط الذي تم استخراجه سابقًا
                                     await client.send_message('@DamKombot', str(points_amount))
                                     await conv.send_message(f"✅ **تم تحويل {points_amount} نقطة من الحساب رقم {account_index + 1} إلى الأيدي {target_id}.**")
@@ -2154,7 +2173,8 @@ async def transfer_points(sender_id, account_index, target_id, conv, retry_count
         raise e  # رفع الخطأ لتسجيله في التقرير
 
     finally:
-        await close_client(session_str)  # إغلاق الاتصال بعد الانتهاء
+        if client.is_connected():
+            await client.disconnect()  # إغلاق الاتصال بعد الانتهاء
 
 # تعريف الحدث لجمع الهدايا
 @bot.on(events.CallbackQuery(pattern='gift'))
@@ -2214,69 +2234,82 @@ async def collect_gift(event):
 # دالة لجمع الهدايا من حساب معين
 async def collect_gift_for_account(sender_id, account_index, conv, max_retries=3):
     session_str = user_accounts[sender_id]["sessions"][account_index]
-    client = await get_client(session_str)
-
+    client = TelegramClient(StringSession(session_str), api_id, api_hash)
+    
     retry_count = 0
     while retry_count < max_retries:
         try:
+            # الاتصال بالعميل
+            await client.connect()
+            if not client.is_connected():
+                raise Exception("فشل في الاتصال بالعميل.")
+
             # إرسال /start إلى بوت @DamKombot
             await client.send_message('@DamKombot', '/start')
             await asyncio.sleep(30)  # تأخير 30 ثانية بين الطلبات
 
             # الحصول على آخر رسالة من البوت
             messages = await client.get_messages('@DamKombot', limit=1)
-            if messages and hasattr(messages[0], 'text') and "عليك الاشتراك بالقنوات" in messages[0].text:
-                # البحث عن الأزرار التي تحتوي على روابط القنوات
+            if not messages or not hasattr(messages[0], 'text'):
+                raise Exception("لم يتم العثور على رسالة من البوت.")
+
+            # التحقق من اشتراك القنوات الإجبارية
+            if "عليك الاشتراك بالقنوات" in messages[0].text:
                 buttons = messages[0].buttons
                 if buttons:
                     for button_row in buttons:
                         for button in button_row:
-                            # التأكد من أن الزر يحتوي على نص
                             if hasattr(button, 'text'):
-                                # استخراج الرابط من الزر (إذا كان يحتوي على @)
                                 link = re.search(r'@(\w+)', button.text)
                                 if link:
                                     channel_username = link.group(0)
-                                    # الاشتراك في القناة
-                                    await client(JoinChannelRequest(channel_username))
-                                    await conv.send_message(f"✅ **الحساب رقم {account_index + 1} اشترك في قناة الإشتراك الاجباري {channel_username}.**")
-                                    await asyncio.sleep(30)  # تأخير 30 ثانية بين الطلبات
+                                    try:
+                                        await client(JoinChannelRequest(channel_username))
+                                        await conv.send_message(f"✅ **الحساب رقم {account_index + 1} اشترك في قناة الإشتراك الاجباري {channel_username}.**")
+                                        await asyncio.sleep(30)  # تأخير 30 ثانية بين الطلبات
+                                    except FloodWaitError as e:
+                                        await conv.send_message(f"⏳ **الحساب رقم {account_index + 1}: يلزم الانتظار {e.seconds} ثانية.**")
+                                        await asyncio.sleep(e.seconds + 5)  # الانتظار للمدة المطلوبة + 5 ثواني إضافية
+                                    except Exception as e:
+                                        await conv.send_message(f"❌ **الحساب رقم {account_index + 1}: حدث خطأ أثناء الاشتراك في القناة {channel_username}: {str(e)}**")
+                await client.send_message('@DamKombot', '/start')
+                await asyncio.sleep(30)  # تأخير 30 ثانية بين الطلبات
 
-            # إعادة إرسال /start بعد الاشتراك في القنوات
-            await client.send_message('@DamKombot', '/start')
-            await asyncio.sleep(30)  # تأخير 30 ثانية بين الطلبات
-
-            # إرسال إخطار للمستخدم ببدء تجميع الهدية
-            await conv.send_message(f"✅ **بدأ تجميع الهدية في الحساب رقم {account_index + 1}...**")
-
-            # الحصول على آخر رسالة من البوت
+            # التحقق من رسالة النقاط
             messages = await client.get_messages('@DamKombot', limit=1)
-            if messages and hasattr(messages[0], 'text') and "نقاطك" in messages[0].text:
+            if not messages or not hasattr(messages[0], 'text'):
+                raise Exception("لم يتم العثور على رسالة النقاط.")
+
+            if "نقاطك" in messages[0].text:
                 # الضغط على زر "تجميع ✳️"
                 await messages[0].click(text="تجميع ✳️")
                 await asyncio.sleep(30)  # تأخير 30 ثانية بين الطلبات
 
                 # الحصول على آخر رسالة من البوت بعد الضغط على زر التجميع
                 messages = await client.get_messages('@DamKombot', limit=1)
-                if messages and hasattr(messages[0], 'text') and "✳️ تجميع نقاط" in messages[0].text:
+                if not messages or not hasattr(messages[0], 'text'):
+                    raise Exception("لم يتم العثور على رسالة بعد التجميع.")
+
+                if "✳️ تجميع نقاط" in messages[0].text:
                     # الضغط على زر "الهدية 🎁"
                     await messages[0].click(text="الهدية 🎁")
                     await asyncio.sleep(30)  # تأخير 30 ثانية بين الطلبات
 
                     # الحصول على آخر رسالة من البوت بعد الضغط على زر الهدية
                     messages = await client.get_messages('@DamKombot', limit=1)
-                    if messages and hasattr(messages[0], 'text'):
-                        if "🗃️ الحساب" in messages[0].text:
-                            # إرسال إخطار بأن الهدية تم جمعها بنجاح
-                            await conv.send_message(f"✅ **تم جمع الهدية في الحساب رقم {account_index + 1}.**")
-                            # إرسال /start لإيقاف العملية
-                            await client.send_message('@DamKombot', '/start')
-                            await asyncio.sleep(30)  # تأخير 30 ثانية بين الطلبات
-                            return  # نجاح العملية
-                        else:
-                            raise Exception("تم جمع الهدية من قبل.")
-                    else:
+                    if not messages or not hasattr(messages[0], 'text'):
                         raise Exception("لم يتم العثور على رسالة الهدية.")
+
+                    if "🗃️ الحساب" in messages[0].text:
+                        # إرسال إخطار بأن الهدية تم جمعها بنجاح
+                        await conv.send_message(f"✅ **تم جمع الهدية في الحساب رقم {account_index + 1}.**")
+                        return  # نجاح العملية
+                    elif "تم جمع الهدية من قبل" in messages[0].text:
+                        # إرسال إخطار بأن الهدية قد تم جمعها مسبقًا
+                        await conv.send_message(f"⚠️ **الحساب رقم {account_index + 1}: الهدية قد تم جمعها مسبقًا.**")
+                        return  # إنهاء العملية دون اعتبارها خطأ
+                    else:
+                        raise Exception("رسالة غير متوقعة من البوت.")
                 else:
                     raise Exception("لم يتم العثور على زر الهدية.")
             else:
@@ -2297,7 +2330,8 @@ async def collect_gift_for_account(sender_id, account_index, conv, max_retries=3
                 raise e  # رفع الخطأ إذا فشلت جميع المحاولات
 
         finally:
-            await close_client(session_str)
+            if client.is_connected():
+                await client.disconnect()
 
 @bot.on(events.CallbackQuery(pattern='charge'))  # تعريف الزر بـ use_code
 async def use_code(event):
