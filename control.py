@@ -2645,7 +2645,7 @@ def keep_alive():
     while True:
         try:
             # استخدم الرابط الكامل مع البروتوكول (https://)
-            requests.get("https://chronic-eddie-diverse-adel-dheyey7-6dc09ea7.koyeb.app/")
+            requests.get("https://chronic-eddie-shy-vittoria-dheyey7-8de68022.koyeb.app/")
         except Exception as e:
             print(f"Error in keep_alive: {e}")
         time.sleep(300)  # انتظر 5 دقائق قبل إرسال الطلب التالي
