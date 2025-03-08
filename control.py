@@ -2644,7 +2644,8 @@ def run_server():
 def keep_alive():
     while True:
         try:
-            requests.get("diverse-adel-dheyey7-6dc09ea7.koyeb.app/")  # استخدم الرابط الصحيح هنا
+            # استخدم الرابط الكامل مع البروتوكول (https://)
+            requests.get("https://chronic-eddie-diverse-adel-dheyey7-6dc09ea7.koyeb.app/")
         except Exception as e:
             print(f"Error in keep_alive: {e}")
         time.sleep(300)  # انتظر 5 دقائق قبل إرسال الطلب التالي
@@ -2658,7 +2659,6 @@ server_thread.start()
 keep_alive_thread = threading.Thread(target=keep_alive)
 keep_alive_thread.daemon = True  # يجعل الخيط ينتهي عند انتهاء البرنامج الرئيسي
 keep_alive_thread.start()
-
             
 while True:
     try:
