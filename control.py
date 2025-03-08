@@ -2633,15 +2633,31 @@ async def send_user_id(event):
     )        
         
 
+# تشغيل خادم HTTP على المنفذ 8000
 def run_server():
     handler = http.server.SimpleHTTPRequestHandler
     with socketserver.TCPServer(("", 8000), handler) as httpd:
         print("Serving on port 8000")
         httpd.serve_forever()
 
+# تشغيل وظيفة keep_alive لإرسال طلبات HTTP دورية
+def keep_alive():
+    while True:
+        try:
+            requests.get("diverse-adel-dheyey7-6dc09ea7.koyeb.app/")  # استخدم الرابط الصحيح هنا
+        except Exception as e:
+            print(f"Error in keep_alive: {e}")
+        time.sleep(300)  # انتظر 5 دقائق قبل إرسال الطلب التالي
+
 # تشغيل الخادم في خيط جديد
 server_thread = threading.Thread(target=run_server)
-server_thread.start()	                
+server_thread.daemon = True  # يجعل الخيط ينتهي عند انتهاء البرنامج الرئيسي
+server_thread.start()
+
+# تشغيل وظيفة keep_alive في خيط منفصل
+keep_alive_thread = threading.Thread(target=keep_alive)
+keep_alive_thread.daemon = True  # يجعل الخيط ينتهي عند انتهاء البرنامج الرئيسي
+keep_alive_thread.start()
 
             
 while True:
