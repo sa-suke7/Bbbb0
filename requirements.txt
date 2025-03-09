@@ -3,4 +3,3 @@ requests
 python-dotenv
 psycopg2
 requests
-aiohttp
