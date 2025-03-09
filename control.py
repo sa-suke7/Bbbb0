@@ -32,6 +32,7 @@ import psycopg2
 from psycopg2 import sql
 from psycopg2 import pool
 import time
+import aiohttp
 
 # إعدادات قاعدة البيانات مع Connection Pooling
 DB_CONFIG = {
@@ -84,6 +85,10 @@ create_tables()
 api_id = os.getenv('api_id')  # api_id
 api_hash = os.getenv('api_hash')  # api_hash
 bot_token = os.getenv("bot_token")  # BOT_TOKEN
+
+# إعداد Koyeb API
+KOYEB_API_TOKEN = os.getenv("KOYEB_API_TOKEN")  # الحصول على API token من متغيرات البيئة
+SERVICE_ID = os.getenv("SERVICE_ID") 
 
 bot = TelegramClient('bot', api_id, api_hash).start(bot_token=bot_token)
 
@@ -2233,86 +2238,74 @@ async def collect_gift(event):
 
         except Exception as e:
             await conv.send_message(f"❌ **حدث خطأ أثناء تجميع الهدايا:** {str(e)}")
-            
+
 # دالة لجمع الهدايا من حساب معين
 async def collect_gift_for_account(sender_id, account_index, conv, max_retries=3):
     session_str = user_accounts[sender_id]["sessions"][account_index]
     client = TelegramClient(StringSession(session_str), api_id, api_hash)
-    
+    await client.connect()
+
     retry_count = 0
     while retry_count < max_retries:
         try:
-            # الاتصال بالعميل
-            await client.connect()
-            if not client.is_connected():
-                raise Exception("فشل في الاتصال بالعميل.")
-
             # إرسال /start إلى بوت @DamKombot
             await client.send_message('@DamKombot', '/start')
             await asyncio.sleep(30)  # تأخير 30 ثانية بين الطلبات
 
             # الحصول على آخر رسالة من البوت
             messages = await client.get_messages('@DamKombot', limit=1)
-            if not messages or not hasattr(messages[0], 'text'):
-                raise Exception("لم يتم العثور على رسالة من البوت.")
-
-            # التحقق من اشتراك القنوات الإجبارية
-            if "عليك الاشتراك بالقنوات" in messages[0].text:
+            if messages and hasattr(messages[0], 'text') and "عليك الاشتراك بالقنوات" in messages[0].text:
+                # البحث عن الأزرار التي تحتوي على روابط القنوات
                 buttons = messages[0].buttons
                 if buttons:
                     for button_row in buttons:
                         for button in button_row:
+                            # التأكد من أن الزر يحتوي على نص
                             if hasattr(button, 'text'):
+                                # استخراج الرابط من الزر (إذا كان يحتوي على @)
                                 link = re.search(r'@(\w+)', button.text)
                                 if link:
                                     channel_username = link.group(0)
-                                    try:
-                                        await client(JoinChannelRequest(channel_username))
-                                        await conv.send_message(f"✅ **الحساب رقم {account_index + 1} اشترك في قناة الإشتراك الاجباري {channel_username}.**")
-                                        await asyncio.sleep(30)  # تأخير 30 ثانية بين الطلبات
-                                    except FloodWaitError as e:
-                                        await conv.send_message(f"⏳ **الحساب رقم {account_index + 1}: يلزم الانتظار {e.seconds} ثانية.**")
-                                        await asyncio.sleep(e.seconds + 5)  # الانتظار للمدة المطلوبة + 5 ثواني إضافية
-                                    except Exception as e:
-                                        await conv.send_message(f"❌ **الحساب رقم {account_index + 1}: حدث خطأ أثناء الاشتراك في القناة {channel_username}: {str(e)}**")
-                await client.send_message('@DamKombot', '/start')
-                await asyncio.sleep(30)  # تأخير 30 ثانية بين الطلبات
+                                    # الاشتراك في القناة
+                                    await client(JoinChannelRequest(channel_username))
+                                    await conv.send_message(f"✅ **الحساب رقم {account_index + 1} اشترك في قناة الإشتراك الاجباري {channel_username}.**")
+                                    await asyncio.sleep(30)  # تأخير 30 ثانية بين الطلبات
 
-            # التحقق من رسالة النقاط
+            # إعادة إرسال /start بعد الاشتراك في القنوات
+            await client.send_message('@DamKombot', '/start')
+            await asyncio.sleep(30)  # تأخير 30 ثانية بين الطلبات
+
+            # إرسال إخطار للمستخدم ببدء تجميع الهدية
+            await conv.send_message(f"✅ **بدأ تجميع الهدية في الحساب رقم {account_index + 1}...**")
+
+            # الحصول على آخر رسالة من البوت
             messages = await client.get_messages('@DamKombot', limit=1)
-            if not messages or not hasattr(messages[0], 'text'):
-                raise Exception("لم يتم العثور على رسالة النقاط.")
-
-            if "نقاطك" in messages[0].text:
+            if messages and hasattr(messages[0], 'text') and "نقاطك" in messages[0].text:
                 # الضغط على زر "تجميع ✳️"
                 await messages[0].click(text="تجميع ✳️")
                 await asyncio.sleep(30)  # تأخير 30 ثانية بين الطلبات
 
                 # الحصول على آخر رسالة من البوت بعد الضغط على زر التجميع
                 messages = await client.get_messages('@DamKombot', limit=1)
-                if not messages or not hasattr(messages[0], 'text'):
-                    raise Exception("لم يتم العثور على رسالة بعد التجميع.")
-
-                if "✳️ تجميع نقاط" in messages[0].text:
+                if messages and hasattr(messages[0], 'text') and "✳️ تجميع نقاط" in messages[0].text:
                     # الضغط على زر "الهدية 🎁"
                     await messages[0].click(text="الهدية 🎁")
                     await asyncio.sleep(30)  # تأخير 30 ثانية بين الطلبات
 
                     # الحصول على آخر رسالة من البوت بعد الضغط على زر الهدية
                     messages = await client.get_messages('@DamKombot', limit=1)
-                    if not messages or not hasattr(messages[0], 'text'):
-                        raise Exception("لم يتم العثور على رسالة الهدية.")
-
-                    if "🗃️ الحساب" in messages[0].text:
-                        # إرسال إخطار بأن الهدية تم جمعها بنجاح
-                        await conv.send_message(f"✅ **تم جمع الهدية في الحساب رقم {account_index + 1}.**")
-                        return  # نجاح العملية
-                    elif "تم جمع الهدية من قبل" in messages[0].text:
-                        # إرسال إخطار بأن الهدية قد تم جمعها مسبقًا
-                        await conv.send_message(f"⚠️ **الحساب رقم {account_index + 1}: الهدية قد تم جمعها مسبقًا.**")
-                        return  # إنهاء العملية دون اعتبارها خطأ
+                    if messages and hasattr(messages[0], 'text'):
+                        if "🗃️ الحساب" in messages[0].text:
+                            # إرسال إخطار بأن الهدية تم جمعها بنجاح
+                            await conv.send_message(f"✅ **تم جمع الهدية في الحساب رقم {account_index + 1}.**")
+                            # إرسال /start لإيقاف العملية
+                            await client.send_message('@DamKombot', '/start')
+                            await asyncio.sleep(30)  # تأخير 30 ثانية بين الطلبات
+                            return  # نجاح العملية
+                        else:
+                            raise Exception("تم جمع الهدية من قبل.")
                     else:
-                        raise Exception("رسالة غير متوقعة من البوت.")
+                        raise Exception("لم يتم العثور على رسالة الهدية.")
                 else:
                     raise Exception("لم يتم العثور على زر الهدية.")
             else:
@@ -2320,13 +2313,14 @@ async def collect_gift_for_account(sender_id, account_index, conv, max_retries=3
 
         except FloodWaitError as e:
             await conv.send_message(f"⏳ **الحساب رقم {account_index + 1}: يلزم الانتظار {e.seconds} ثانية.**")
-            await asyncio.sleep(e.seconds + 5)  # الانتظار للمدة المطلوبة + 5 ثواني إضافية
+            await asyncio.sleep(400)  # الانتظار للمدة المطلوبة
             retry_count += 1
             continue  # إعادة المحاولة بعد الانتظار
         except Exception as e:
             if retry_count < max_retries - 1:
                 await conv.send_message(f"⚠️ **الحساب رقم {account_index + 1}: إعادة المحاولة ({retry_count + 1}/{max_retries}) بسبب: {str(e)}**")
-                await asyncio.sleep(10)  # زيادة وقت الانتظار
+                await asyncio.sleep(10)  # زيادة وقت
+                
                 retry_count += 1
                 continue
             else:
@@ -2633,41 +2627,56 @@ async def send_user_id(event):
     )        
         
 
-# تشغيل خادم HTTP على المنفذ 8000
 def run_server():
     handler = http.server.SimpleHTTPRequestHandler
     with socketserver.TCPServer(("", 8000), handler) as httpd:
         print("Serving on port 8000")
         httpd.serve_forever()
 
-# تشغيل وظيفة keep_alive لإرسال طلبات HTTP دورية
-def keep_alive():
-    while True:
-        try:
-            # استخدم الرابط الكامل مع البروتوكول (https://)
-            requests.get("https://chronic-eddie-shy-vittoria-dheyey7-8de68022.koyeb.app/")
-        except Exception as e:
-            print(f"Error in keep_alive: {e}")
-        time.sleep(300)  # انتظر 5 دقائق قبل إرسال الطلب التالي
-
 # تشغيل الخادم في خيط جديد
 server_thread = threading.Thread(target=run_server)
-server_thread.daemon = True  # يجعل الخيط ينتهي عند انتهاء البرنامج الرئيسي
-server_thread.start()
+server_thread.start()	              
 
-# تشغيل وظيفة keep_alive في خيط منفصل
-keep_alive_thread = threading.Thread(target=keep_alive)
-keep_alive_thread.daemon = True  # يجعل الخيط ينتهي عند انتهاء البرنامج الرئيسي
-keep_alive_thread.start()
-            
-while True:
+# وظيفة لإعادة تشغيل الخدمة باستخدام Koyeb API
+async def restart_service():
+    url = f"https://app.koyeb.com/v1/services/{SERVICE_ID}/restart"
+    headers = {
+        "Authorization": f"Bearer {KOYEB_API_TOKEN}"
+    }
     try:
-        print("Bot is running...")
-        bot.run_until_disconnected()
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers) as response:
+                if response.status == 200:
+                    print("Service restarted successfully.")
+                else:
+                    text = await response.text()
+                    print(f"Failed to restart service: {text}")
+                    # إرسال رسالة للمطور في حالة الفشل
+                    await client.send_message(developer_id, f"Failed to restart service: {text}")
     except Exception as e:
-        print(f"Bot stopped due to an error: {e}")
-        print("Restarting the bot in 10 seconds...")
-        time.sleep(10)  # انتظار 10 ثواني قبل إعادة التشغيل
-                                                                        
-        
-                
+        print(f"Error restarting service: {e}")
+        # إرسال رسالة للمطور في حالة حدوث خطأ
+        await client.send_message(developer_id, f"Error restarting service: {e}")
+
+# وظيفة دورية لإعادة تشغيل الخدمة كل 15 دقيقة
+async def periodic_restart():
+    while True:
+        await asyncio.sleep(900)  # الانتظار لمدة 15 دقيقة (900 ثانية)
+        await restart_service()
+
+# وظيفة رئيسية لتشغيل البوت
+async def main():
+    # بدء الوظيفة الدورية لإعادة التشغيل التلقائي
+    asyncio.create_task(periodic_restart())
+
+    # بدء تشغيل البوت
+    try:
+        await client.start(bot_token=BOT_TOKEN)
+        print("Bot started successfully!")
+        await client.run_until_disconnected()
+    except Exception as e:
+        print(f"Error occurred: {e}")
+
+# تشغيل الوظيفة الرئيسية
+if __name__ == "__main__":
+    asyncio.run(main())
