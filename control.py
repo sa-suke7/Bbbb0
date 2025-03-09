@@ -32,8 +32,6 @@ import psycopg2
 from psycopg2 import sql
 from psycopg2 import pool
 import time
-import aiohttp
-from aiohttp import web
 # إعدادات قاعدة البيانات مع Connection Pooling
 DB_CONFIG = {
     'dbname': os.getenv('dbname'),
@@ -85,10 +83,6 @@ create_tables()
 api_id = os.getenv('api_id')  # api_id
 api_hash = os.getenv('api_hash')  # api_hash
 bot_token = os.getenv("bot_token")  # BOT_TOKEN
-
-# إعداد Koyeb API
-KOYEB_API_TOKEN = os.getenv("KOYEB_API_TOKEN")  # الحصول على API token من متغيرات البيئة
-SERVICE_ID = os.getenv("SERVICE_ID") 
 
 bot = TelegramClient('bot', api_id, api_hash).start(bot_token=bot_token)
 
@@ -2628,65 +2622,23 @@ async def send_user_id(event):
     )        
        
 
-# وظيفة لإعادة تشغيل الخدمة باستخدام Koyeb API
-async def restart_service():
-    url = f"https://app.koyeb.com/v1/services/{SERVICE_ID}/restart"
-    headers = {
-        "Authorization": f"Bearer {KOYEB_API_TOKEN}"
-    }
+def run_server():
+    handler = http.server.SimpleHTTPRequestHandler
+    with socketserver.TCPServer(("", 8000), handler) as httpd:
+        print("Serving on port 8000")
+        httpd.serve_forever()
+
+# تشغيل الخادم في خيط جديد
+server_thread = threading.Thread(target=run_server)
+server_thread.start()	                
+
+            
+while True:
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers) as response:
-                if response.status == 200:
-                    print("Service restarted successfully.")
-                else:
-                    text = await response.text()
-                    print(f"Failed to restart service: {text}")
-                    # إرسال رسالة للمطور في حالة الفشل
-                    await bot.send_message(developer_id, f"Failed to restart service: {text}")
+        print("Bot is running...")
+        bot.run_until_disconnected()
     except Exception as e:
-        print(f"Error restarting service: {e}")
-        # إرسال رسالة للمطور في حالة حدوث خطأ
-        await bot.send_message(developer_id, f"Error restarting service: {e}")
-
-# وظيفة دورية لإعادة التشغيل كل 15 دقيقة
-async def periodic_restart():
-    while True:
-        await asyncio.sleep(900)  # الانتظار لمدة 15 دقيقة (900 ثانية)
-        await restart_service()
-
-# وظيفة لإنشاء خادم HTTP
-async def start_http_server():
-    async def handle(request):
-        return web.Response(text="Hello, world!")
-
-    app = web.Application()
-    app.router.add_get('/', handle)
-
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, '0.0.0.0', 8000)
-    await site.start()
-    print("Serving on port 8000")
-
-# وظيفة رئيسية لتشغيل البوت والخادم HTTP
-async def main():
-    # بدء الوظيفة الدورية لإعادة التشغيل التلقائي
-    asyncio.create_task(periodic_restart())
-
-    # بدء تشغيل الخادم HTTP
-    asyncio.create_task(start_http_server())
-
-    # بدء تشغيل البوت
-    try:
-        await bot.start(bot_token=bot_token)
-        print("Bot started successfully!")
-        await bot.run_until_disconnected()
-    except Exception as e:
-        print(f"Error occurred: {e}")
-
-# تشغيل الوظيفة الرئيسية
-if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
-    loop.run_forever()
+        print(f"Bot stopped due to an error: {e}")
+        print("Restarting the bot in 10 seconds...")
+        time.sleep(10)  # انتظار 10 ثواني قبل إعادة التشغيل
+                                                                        
