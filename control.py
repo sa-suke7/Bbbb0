@@ -90,8 +90,7 @@ bot_token = os.getenv("bot_token")  # BOT_TOKEN
 KOYEB_API_TOKEN = os.getenv("KOYEB_API_TOKEN")  # الحصول على API token من متغيرات البيئة
 SERVICE_ID = os.getenv("SERVICE_ID") 
 
-client = TelegramClient('bot_session', api_id, api_hash)
-
+bot = TelegramClient('bot', api_id, api_hash).start(bot_token=bot_token)
 
 user_accounts = {}  # {user_id: {"sessions": [], "users": []}}
 allowed_users = []  # المستخدمون المسموح لهم باستخدام البوت
@@ -2653,11 +2652,11 @@ async def restart_service():
                     text = await response.text()
                     print(f"Failed to restart service: {text}")
                     # إرسال رسالة للمطور في حالة الفشل
-                    await client.send_message(developer_id, f"Failed to restart service: {text}")
+                    await bot.send_message(developer_id, f"Failed to restart service: {text}")  # تغيير client إلى bot
     except Exception as e:
         print(f"Error restarting service: {e}")
         # إرسال رسالة للمطور في حالة حدوث خطأ
-        await client.send_message(developer_id, f"Error restarting service: {e}")
+        await bot.send_message(developer_id, f"Error restarting service: {e}")  # تغيير client إلى bot
 
 # وظيفة دورية لإعادة تشغيل الخدمة كل 15 دقيقة
 async def periodic_restart():
@@ -2672,9 +2671,9 @@ async def main():
 
     # بدء تشغيل البوت
     try:
-        await client.start(bot_token=BOT_TOKEN)
+        await bot.start(bot_token=bot_token)  # تغيير client إلى bot
         print("Bot started successfully!")
-        await client.run_until_disconnected()
+        await bot.run_until_disconnected()  # تغيير client إلى bot
     except Exception as e:
         print(f"Error occurred: {e}")
 
