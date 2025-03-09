@@ -33,7 +33,7 @@ from psycopg2 import sql
 from psycopg2 import pool
 import time
 import aiohttp
-
+from aiohttp import web
 # إعدادات قاعدة البيانات مع Connection Pooling
 DB_CONFIG = {
     'dbname': os.getenv('dbname'),
@@ -2625,17 +2625,7 @@ async def send_user_id(event):
         f"⌁︙أهـلاً بـك <a href='http://t.me/{username}'>{name}</a>\n⌁︙ال ID الخاص بحسابك هو\n<code>{user_id}</code>",
         parse_mode='HTML'
     )        
-        
-
-def run_server():
-    handler = http.server.SimpleHTTPRequestHandler
-    with socketserver.TCPServer(("", 8000), handler) as httpd:
-        print("Serving on port 8000")
-        httpd.serve_forever()
-
-# تشغيل الخادم في خيط جديد
-server_thread = threading.Thread(target=run_server)
-server_thread.start()	              
+       
 
 # وظيفة لإعادة تشغيل الخدمة باستخدام Koyeb API
 async def restart_service():
@@ -2652,31 +2642,50 @@ async def restart_service():
                     text = await response.text()
                     print(f"Failed to restart service: {text}")
                     # إرسال رسالة للمطور في حالة الفشل
-                    await bot.send_message(developer_id, f"Failed to restart service: {text}")  # تغيير client إلى bot
+                    await bot.send_message(developer_id, f"Failed to restart service: {text}")
     except Exception as e:
         print(f"Error restarting service: {e}")
         # إرسال رسالة للمطور في حالة حدوث خطأ
-        await bot.send_message(developer_id, f"Error restarting service: {e}")  # تغيير client إلى bot
+        await bot.send_message(developer_id, f"Error restarting service: {e}")
 
-# وظيفة دورية لإعادة تشغيل الخدمة كل 15 دقيقة
+# وظيفة دورية لإعادة التشغيل كل 15 دقيقة
 async def periodic_restart():
     while True:
         await asyncio.sleep(900)  # الانتظار لمدة 15 دقيقة (900 ثانية)
         await restart_service()
 
-# وظيفة رئيسية لتشغيل البوت
+# وظيفة لإنشاء خادم HTTP
+async def start_http_server():
+    async def handle(request):
+        return web.Response(text="Hello, world!")
+
+    app = web.Application()
+    app.router.add_get('/', handle)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', 8000)
+    await site.start()
+    print("Serving on port 8000")
+
+# وظيفة رئيسية لتشغيل البوت والخادم HTTP
 async def main():
     # بدء الوظيفة الدورية لإعادة التشغيل التلقائي
     asyncio.create_task(periodic_restart())
 
+    # بدء تشغيل الخادم HTTP
+    asyncio.create_task(start_http_server())
+
     # بدء تشغيل البوت
     try:
-        await bot.start(bot_token=bot_token)  # تغيير client إلى bot
+        await bot.start(bot_token=bot_token)
         print("Bot started successfully!")
-        await bot.run_until_disconnected()  # تغيير client إلى bot
+        await bot.run_until_disconnected()
     except Exception as e:
         print(f"Error occurred: {e}")
 
 # تشغيل الوظيفة الرئيسية
 if __name__ == "__main__":
-    asyncio.run(main())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
+    loop.run_forever()
