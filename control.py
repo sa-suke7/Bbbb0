@@ -90,7 +90,8 @@ bot_token = os.getenv("bot_token")  # BOT_TOKEN
 KOYEB_API_TOKEN = os.getenv("KOYEB_API_TOKEN")  # الحصول على API token من متغيرات البيئة
 SERVICE_ID = os.getenv("SERVICE_ID") 
 
-bot = TelegramClient('bot', api_id, api_hash).start(bot_token=bot_token)
+client = TelegramClient('bot_session', api_id, api_hash)
+
 
 user_accounts = {}  # {user_id: {"sessions": [], "users": []}}
 allowed_users = []  # المستخدمون المسموح لهم باستخدام البوت
