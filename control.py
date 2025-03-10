@@ -204,7 +204,7 @@ async def start(event):
         [Button.inline('📥 جلب الكود', 'get_code'), Button.inline('📞 جلب رقم الهاتف', 'get_phone')],
         [Button.inline('🖼️ إضافة صورة', 'add_profile_photo'), Button.inline('📤 رفع صورة لتلجراف', 'telegraph')],
         [Button.inline('🔄 تغيير اليوزر', 'change_username'), Button.inline('📝 تغيير الاسم', 'change_name')],
-        [Button.inline('👁️ مشاهدة منشور', 'view_post'), Button.inline('📽️ مشاهدة استوري', 'view_story')],
+        [Button.inline('👁️ مشاهدة منشور', 'zezo'), Button.inline('📽️ مشاهدة استوري', 'view_story')],
         [Button.inline('🚀 انضمام لقناة', 'join'), Button.inline('🚪 غادر قناة', 'leave')],
         [Button.inline('🎉 رشق تفاعلات', 'react')],
         [Button.inline('⚙️ أوامر السوبرات', 'publish_commands'), Button.inline('اوامر بوت دعمكم', 'support_commands')],
@@ -1624,7 +1624,7 @@ async def change_username(event):
             await client.disconnect()
 
         except Exception as e:
-            await conv.send_message(f"❌ حدث خطأ غير متوقع: {str(e)}")                                                                                                                                                    @bot.on(events.CallbackQuery(pattern='view_post'))
+            await conv.send_message(f"❌ حدث خطأ غير متوقع: {str(e)}")                                                                                                                                                    @bot.on(events.CallbackQuery(pattern='zezo'))
 async def view_post(event):
     sender_id = str(event.sender_id)
     username = f"@{event.sender.username}" if event.sender.username else sender_id  
@@ -2210,19 +2210,30 @@ async def collect_gift(event):
             success_reports = []
             failure_reports = []
 
-            for i in range(0, len(account_indices), 3):
-                batch = account_indices[i:i + 3]
-                results = await asyncio.gather(*[collect_gift_for_account(sender_id, idx, conv) for idx in batch], return_exceptions=True)
+            # إنشاء قائمة بالمهام
+            tasks = []
+            for idx in account_indices:
+                task = asyncio.create_task(collect_gift_for_account(sender_id, idx, conv))
+                tasks.append(task)
+                if len(tasks) >= 3:
+                    done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                    for completed_task in done:
+                        try:
+                            result = completed_task.result()
+                            success_reports.append(f"✅ **الحساب رقم {result + 1}:** تم جمع الهدية بنجاح.")
+                        except Exception as e:
+                            failure_reports.append(f"❌ **الحساب رقم {idx + 1}:** فشل بسبب: {str(e)}")
+                    tasks = list(pending)  # تحديث قائمة المهام المعلقة
 
-                # تسجيل النتائج
-                for idx, result in zip(batch, results):
-                    if isinstance(result, Exception):
-                        failure_reports.append(f"❌ **الحساب رقم {idx + 1}:** فشل بسبب: {str(result)}")
-                    else:
-                        success_reports.append(f"✅ **الحساب رقم {idx + 1}:** تم جمع الهدية بنجاح.")
-
-                # انتظار 15 ثانية بين كل دفعة
-                await asyncio.sleep(15)
+            # انتظار بقية المهام إذا كانت هناك أي مهام معلقة
+            if tasks:
+                done, pending = await asyncio.wait(tasks)
+                for completed_task in done:
+                    try:
+                        result = completed_task.result()
+                        success_reports.append(f"✅ **الحساب رقم {result + 1}:** تم جمع الهدية بنجاح.")
+                    except Exception as e:
+                        failure_reports.append(f"❌ **الحساب رقم {idx + 1}:** فشل بسبب: {str(e)}")
 
             # إرسال التقرير النهائي
             report = "📊 **تقرير تجميع الهدايا:**\n\n"
@@ -2242,6 +2253,10 @@ async def collect_gift_for_account(sender_id, account_index, conv, max_retries=3
     retry_count = 0
     while retry_count < max_retries:
         try:
+            # التحقق من اتصال العميل
+            if not client.is_connected():
+                await client.connect()
+
             # إرسال /start إلى بوت @DamKombot
             await client.send_message('@DamKombot', '/start')
             await asyncio.sleep(15)  # انتظار 15 ثانية بين الطلبات
@@ -2295,7 +2310,7 @@ async def collect_gift_for_account(sender_id, account_index, conv, max_retries=3
                             # إرسال /start لإيقاف العملية
                             await client.send_message('@DamKombot', '/start')
                             await asyncio.sleep(15)  # انتظار 15 ثانية بين الطلبات
-                            return  # نجاح العملية
+                            return account_index  # نجاح العملية
                         else:
                             raise Exception("تم جمع الهدية من قبل.")
                     else:
@@ -2311,6 +2326,8 @@ async def collect_gift_for_account(sender_id, account_index, conv, max_retries=3
             retry_count += 1
             continue  # إعادة المحاولة بعد الانتظار
         except Exception as e:
+            if "تم جمع الهدية من قبل" in str(e):
+                return account_index  # اعتبارها نجاحًا إذا كانت الهدية قد تم جمعها من قبل
             if retry_count < max_retries - 1:
                 await conv.send_message(f"⚠️ **الحساب رقم {account_index + 1}: إعادة المحاولة ({retry_count + 1}/{max_retries}) بسبب: {str(e)}**")
                 await asyncio.sleep(15)  # انتظار 15 ثانية بين المحاولات
