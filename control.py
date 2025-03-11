@@ -2176,6 +2176,7 @@ async def transfer_points(sender_id, account_index, target_id, conv, retry_count
         if client.is_connected():
             await client.disconnect()  # إغلاق الاتصال 
 
+
 @bot.on(events.CallbackQuery(pattern='gift'))
 async def collect_gift(event):
     sender_id = str(event.sender_id)
@@ -2312,7 +2313,9 @@ async def collect_gift_for_account(sender_id, account_index, conv, max_retries=3
                             await asyncio.sleep(15)  # انتظار 15 ثانية بين الطلبات
                             return account_index  # نجاح العملية
                         else:
-                            raise Exception("تم جمع الهدية من قبل.")
+                            # إذا كانت الهدية قد تم جمعها مسبقًا
+                            await conv.send_message(f"⚠️ **الحساب رقم {account_index + 1}: الهدية قد تم جمعها مسبقًا.**")
+                            return account_index  # اعتبارها نجاحًا مع إشعار
                     else:
                         raise Exception("لم يتم العثور على رسالة الهدية.")
                 else:
@@ -2327,7 +2330,8 @@ async def collect_gift_for_account(sender_id, account_index, conv, max_retries=3
             continue  # إعادة المحاولة بعد الانتظار
         except Exception as e:
             if "تم جمع الهدية من قبل" in str(e):
-                return account_index  # اعتبارها نجاحًا إذا كانت الهدية قد تم جمعها من قبل
+                await conv.send_message(f"⚠️ **الحساب رقم {account_index + 1}: الهدية قد تم جمعها مسبقًا.**")
+                return account_index  # اعتبارها نجاحًا مع إشعار
             if retry_count < max_retries - 1:
                 await conv.send_message(f"⚠️ **الحساب رقم {account_index + 1}: إعادة المحاولة ({retry_count + 1}/{max_retries}) بسبب: {str(e)}**")
                 await asyncio.sleep(15)  # انتظار 15 ثانية بين المحاولات
@@ -2339,7 +2343,6 @@ async def collect_gift_for_account(sender_id, account_index, conv, max_retries=3
         finally:
             if client.is_connected():
                 await client.disconnect()
-
 
 
 @bot.on(events.CallbackQuery(pattern='charge'))  # تعريف الزر بـ use_code
