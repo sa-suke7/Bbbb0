@@ -1746,7 +1746,6 @@ async def repeat_messages(sender_id, group_link, message_content, interval, repe
         if sender_id in repeat_jobs:
             del repeat_jobs[sender_id]
 
-
 @bot.on(events.CallbackQuery(pattern='telegraph'))
 async def telegraph(event):
     sender_id = str(event.sender_id)
@@ -1795,7 +1794,6 @@ async def telegraph(event):
             # رفع الصورة (يعمل في الخلفية)
             upload_task = asyncio.create_task(
                 upload_to_catbox(photo_path)
-            )
             image_url = await upload_task
             
             if image_url.startswith('http'):
@@ -1824,12 +1822,12 @@ async def upload_to_catbox(file_path):
         with open(file_path, 'rb') as f:
             async with aiohttp.ClientSession() as session:
                 data = aiohttp.FormData()
+                data.add_field('reqtype', 'fileupload')  # تم إضافة reqtype هنا
                 data.add_field('fileToUpload', f)
                 
                 async with session.post(
                     'https://catbox.moe/user/api.php',
-                    data={'reqtype': 'fileupload'},
-                    data=data
+                    data=data  # تم تصحيح الخطأ بإزالة المعلمة المكررة
                 ) as response:
                     return await response.text()
     except Exception as e:
