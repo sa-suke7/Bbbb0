@@ -724,7 +724,7 @@ async def leave_channel(event):
         await event.respond("🚫 لا توجد حسابات مسجلة لديك.")
         return
 
-    async with bot.conversation(event.sender_id, exclusive=True) as conv:  # تمت إضافة exclusive=True هنا
+    async with bot.conversation(event.sender_id, exclusive=True) as conv:  # تمت إضافة exclusive=True هناm
         try:
             await conv.send_message("♢ ارسل رابط القناة/المجموعة/الدردشة الخاصة التي تريد المغادرة منها:")
             link = (await conv.get_response()).text.strip()
@@ -815,151 +815,173 @@ async def activate_online(event):
     username = f"@{event.sender.username}" if event.sender.username else sender_id  
 
     if sender_id != str(owner_id) and (sender_id not in allowed_users and username not in allowed_users):
-        await event.respond("🚫 أنت غير مسموح لك باستخدام هذا الخيار.")
+        await event.respond("🚫 أنت غير مسموح لك باستخدام هذا الخيار. لتفعيل البوت تواصل مع المطور.")
         return
-    
-    await reset_conversations()  # إضافة هنا
+        # إغلاق أي محادثة نشطة
+        await reset_conversations()
         
+    # التحقق إذا كان لدى المستخدم حسابات مسجلة
     if sender_id not in user_accounts or not user_accounts[sender_id]["sessions"]:
         await event.respond("🚫 لا توجد حسابات مسجلة لديك.")
         return
 
-    async with bot.conversation(event.sender_id, exclusive=True) as conv:
+    async with bot.conversation(event.sender_id) as conv:
         try:
+            # إعلام المستخدم ببدء التنشيط
             await conv.send_message("🟢 جاري تنشيط الحسابات أونلاين...")
-            success_count = 0
-            failed_accounts = []
 
-            for i, session_str in enumerate(user_accounts[sender_id]["sessions"]):
-                try:
-                    client = await get_client(session_str)
-                    await client(functions.account.UpdateStatusRequest(offline=False))
-                    success_count += 1
-                    await conv.send_message(f"✅ الحساب {i+1} أصبح أونلاين")
-                except Exception as e:
-                    failed_accounts.append(f"{i+1} ({str(e)})")
-                    await conv.send_message(f"❌ خطأ في الحساب {i+1}: {str(e)}")
-                finally:
-                    await close_client(session_str)
-                    await asyncio.sleep(1)
+            # تنشيط الحسابات أونلاين
+            for session_str in user_accounts[sender_id]["sessions"]:
+                client = TelegramClient(StringSession(session_str), api_id, api_hash)
+                await client.connect()
 
-            await conv.send_message(f"✅ تم تنشيط {success_count} حساب")
+                # جعل الحساب أونلاين
+                await client(functions.account.UpdateStatusRequest(offline=False))
+
+                await client.disconnect()
+
+            await conv.send_message("✅ تم تنشيط الحسابات أونلاين بنجاح.")
+
+            # الانتظار لمدة 10 ثواني
             await asyncio.sleep(10)
 
-            # إعادة إلى الأوفلاين
-            for i, session_str in enumerate(user_accounts[sender_id]["sessions"]):
-                try:
-                    client = await get_client(session_str)
-                    await client(functions.account.UpdateStatusRequest(offline=True))
-                    await conv.send_message(f"✅ الحساب {i+1} عاد للأوفلاين")
-                except Exception as e:
-                    await conv.send_message(f"⚠️ فشل إعادة الحساب {i+1} للأوفلاين: {str(e)}")
-                finally:
-                    await close_client(session_str)
-                    await asyncio.sleep(1)
+            # إعادة الحسابات إلى وضع الأوفلاين
+            for session_str in user_accounts[sender_id]["sessions"]:
+                client = TelegramClient(StringSession(session_str), api_id, api_hash)
+                await client.connect()
 
-            report = (
-                f"📊 التقرير النهائي:\n"
-                f"• الحسابات الناجحة: {success_count}\n"
-                f"• الحسابات الفاشلة: {len(failed_accounts)}\n"
-            )
-            if failed_accounts:
-                report += f"• الأخطاء: {', '.join(failed_accounts)}"
-            
-            await conv.send_message(report)
+                # جعل الحساب أوفلاين
+                await client(functions.account.UpdateStatusRequest(offline=True))
 
+                await client.disconnect()
+
+            await conv.send_message("✅ تم إعادة الحسابات إلى وضع الأوفلاين بعد 10 ثواني.")
         except Exception as e:
-            await conv.send_message(f"❌ حدث خطأ جسيم: {str(e)}")
-            await reset_conversations()  # إعادة الضبط عند الخطأ
+            await conv.send_message(f"❌ حدث خطأ أثناء تنشيط الحسابات: {str(e)}")
+
+
 @bot.on(events.CallbackQuery(pattern='view_story'))
 async def handle_view_story(event):
     sender_id = str(event.sender_id)
     username = f"@{event.sender.username}" if event.sender.username else sender_id
     
+    # التحقق من الصلاحيات
     if sender_id != str(owner_id) and (sender_id not in allowed_users and username not in allowed_users):
         await event.respond("🚫 أنت غير مسموح لك باستخدام هذا الخيار.")
         return
-    
-    await reset_conversations()  # إضافة هنا
+        # إغلاق أي محادثة نشطة
+        await reset_conversations()
             
+    # التحقق من وجود حسابات مسجلة
     if sender_id not in user_accounts or not user_accounts[sender_id]["sessions"]:
         await event.respond("🚫 لا توجد حسابات مسجلة لديك.")
         return
 
-    async with bot.conversation(event.sender_id, exclusive=True) as conv:
+    async with bot.conversation(event.sender_id) as conv:
         try:
+            # طلب رابط الاستوري
             await conv.send_message("♢ أرسل رابط الاستوري:")
             story_url = (await conv.get_response()).text.strip()
 
+            # التحقق من صحة الرابط باستخدام regex
             if not re.match(r'^https://t\.me/[a-zA-Z0-9_]+/s/\d+$', story_url):
-                await conv.send_message("❌ رابط غير صحيح")
+                await conv.send_message("❌ رابط غير صحيح. يجب أن يبدأ بـ https://t.me/ ويتبع الصيغة: https://t.me/username/s/123")
                 return
 
+            # استخراج المعرف والرقم من الرابط
             try:
                 parts = story_url.split('/')
-                channel_username = parts[3]
-                story_id = int(parts[5])
-            except Exception:
-                await conv.send_message("❌ تنسيق الرابط غير صحيح")
+                username = parts[3]  # اسم المستخدم
+                story_id = int(parts[5])  # رقم الاستوري
+            except (ValueError, IndexError):
+                await conv.send_message("❌ صيغة الرابط غير صحيحة. مثال صحيح: https://t.me/username/s/123")
                 return
 
+            # طلب عدد الحسابات
             max_accounts = len(user_accounts[sender_id]["sessions"])
-            await conv.send_message(f"♢ عدد الحسابات المستخدمة (1-{max_accounts}):")
+            await conv.send_message(f"♢ عدد الحسابات المستخدمة (الحد الأقصى {max_accounts}):\n\nيمكنك إدخال نطاق مثل 10-20")
             account_input = (await conv.get_response()).text.strip()
 
+            # معالجة النطاق
             if '-' in account_input:
-                start, end = map(int, account_input.split('-'))
-                account_indices = list(range(start-1, end))
+                try:
+                    start, end = map(int, account_input.split('-'))
+                    account_indices = list(range(start - 1, end))
+                except ValueError:
+                    await conv.send_message("❌ صيغة النطاق غير صحيحة. استخدم الصيغة: 10-20")
+                    return
             else:
-                account_count = int(account_input)
-                account_indices = list(range(min(account_count, max_accounts)))
+                try:
+                    account_count = int(account_input)
+                    account_indices = list(range(min(account_count, max_accounts)))
+                except ValueError:
+                    await conv.send_message("❌ يجب إدخال رقم صحيح")
+                    return
 
             successful = 0
-            failed = []
             for i in account_indices:
                 if i >= max_accounts:
+                    await conv.send_message(f"⚠️ تخطي الحساب {i+1} - غير موجود")
                     continue
-                    
-                session_str = user_accounts[sender_id]["sessions"][i]
-                try:
-                    client = await get_client(session_str)
-                    entity = await client.get_entity(channel_username)
-                    
-                    # مشاهدة الاستوري
-                    await client.send_read_acknowledge(entity, story=story_id)
-                    successful += 1
-                    await conv.send_message(f"✅ الحساب {i+1}: تمت المشاهدة")
-                except FloodWaitError as e:
-                    await conv.send_message(f"⏳ الحساب {i+1}: انتظر {e.seconds} ثانية")
-                    await asyncio.sleep(e.seconds)
-                    try:
-                        await client.send_read_acknowledge(entity, story=story_id)
-                        successful += 1
-                        await conv.send_message(f"✅ الحساب {i+1}: تمت المشاهدة بعد الانتظار")
-                    except Exception as e:
-                        failed.append(f"{i+1} (بعد الانتظار: {str(e)})")
-                except Exception as e:
-                    failed.append(f"{i+1} ({str(e)})")
-                    await conv.send_message(f"❌ الحساب {i+1}: {str(e)}")
-                finally:
-                    await close_client(session_str)
-                    await asyncio.sleep(1)
 
-            report = (
-                f"📊 التقرير النهائي:\n"
-                f"• مشاهدات ناجحة: {successful}\n"
-                f"• فشل: {len(failed)}\n"
-                f"• النسبة: {round((successful/max(1,len(account_indices)))*100, 2)}%\n"
-            )
-            if failed:
-                report += f"• الأخطاء: {', '.join(failed)}"
+                session_str = user_accounts[sender_id]["sessions"][i]
+                
+                try:
+                    # إنشاء عميل Telethon
+                    client = TelegramClient(StringSession(session_str), api_id, api_hash)
+                    await client.connect()
+                    
+                    # الحصول على كيان المستخدم
+                    try:
+                        peer = await client.get_entity(username)
+                    except ValueError:
+                        await conv.send_message(f"❌ الحساب {i+1}: المستخدم @{username} غير موجود")
+                        continue
+                    except Exception as e:
+                        await conv.send_message(f"❌ الحساب {i+1}: خطأ في الحصول على المستخدم - {str(e)}")
+                        continue
+
+                    # مشاهدة الاستوري
+                    try:
+                        # هذه طريقة افتراضية - قد تحتاج لتعديلها حسب API التليثون
+                        await client.send_read_acknowledge(peer, story=story_id)
+                        successful += 1
+                        await conv.send_message(f"✅ الحساب {i+1}: تمت مشاهدة الاستوري بنجاح")
+                    except Exception as e:
+                        await conv.send_message(f"⚠️ الحساب {i+1}: لم يتم مشاهدة الاستوري - {str(e)}")
+
+                except FloodWaitError as e:
+                    wait_time = e.seconds
+                    await conv.send_message(f"⏳ الحساب {i+1}: يجب الانتظار {wait_time} ثانية بسبب FloodWait")
+                    await asyncio.sleep(wait_time)
+                    # إعادة المحاولة بعد الانتظار
+                    try:
+                        await client.send_read_acknowledge(peer, story=story_id)
+                        successful += 1
+                        await conv.send_message(f"✅ الحساب {i+1}: تمت مشاهدة الاستوري بعد الانتظار")
+                    except Exception as e:
+                        await conv.send_message(f"❌ الحساب {i+1}: فشل بعد الانتظار - {str(e)}")
+                
+                except Exception as e:
+                    await conv.send_message(f"❌ الحساب {i+1}: خطأ غير متوقع - {str(e)}")
+                
+                finally:
+                    if 'client' in locals() and client.is_connected():
+                        await client.disconnect()
+                    
+                    await asyncio.sleep(2)  # تأخير بين الحسابات
+
+            # إرسال التقرير النهائي
+            report = f"📊 تقرير مشاهدة الاستوري:\n\n"
+            report += f"• الحسابات الناجحة: {successful}\n"
+            report += f"• الحسابات الفاشلة: {len(account_indices) - successful}\n"
+            report += f"• نسبة النجاح: {round((successful/max(1,len(account_indices)))*100, 2)}%"
             
             await conv.send_message(report)
 
         except Exception as e:
-            await conv.send_message(f"❌ حدث خطأ جسيم: {str(e)}")
-            await reset_conversations()
-                        
+            await conv.send_message(f"❌ حدث خطأ جسيم: {str(e)}\nيرجى المحاولة مرة أخرى.")
+            
 
 @bot.on(events.CallbackQuery(pattern='zezo'))
 async def view_post(event):
@@ -970,15 +992,15 @@ async def view_post(event):
     if sender_id != str(owner_id) and (sender_id not in allowed_users and username not in allowed_users):
         await event.respond("🚫 أنت غير مسموح لك باستخدام هذا الخيار. لتفعيل البوت تواصل مع المطور.")
         return
-
-    await reset_conversations()  # إضافة هنا
+        # إغلاق أي محادثة نشطة
+        await reset_conversations()
             
     # التحقق من وجود حسابات
     if sender_id not in user_accounts or not user_accounts.get(sender_id, {}).get("sessions"):
         await event.respond("🚫 لا توجد حسابات مسجلة لديك أو لا توجد جلسات نشطة.")
         return
 
-    async with bot.conversation(event.sender_id, exclusive=True) as conv:
+    async with bot.conversation(event.sender_id) as conv:
         try:
             # طلب رابط المنشور
             await conv.send_message("♢ أرسل رابط المنشور الذي تريد مشاهدته (مثال: https://t.me/channel/123):")
@@ -1055,13 +1077,8 @@ async def view_post(event):
             await conv.send_message(f"✅ تم الانتهاء! عدد المشاهدات الناجحة: {successful_views}/{len(account_indices)}")
             
         except Exception as e:
-            await conv.send_message(f"❌ حدث خطأ غير متوقع: {str(e)}") 
-                                   
-            await conv.send_message(report)
+            await conv.send_message(f"❌ حدث خطأ غير متوقع: {str(e)}")                        
 
-        except Exception as e:
-            await conv.send_message(f"❌ حدث خطأ جسيم: {str(e)}")
-            await reset_conversations()
 
 @bot.on(events.CallbackQuery(pattern='get_code'))
 async def get_last_message(event):
@@ -1070,16 +1087,14 @@ async def get_last_message(event):
     if sender_id != str(owner_id) and (sender_id not in allowed_users and username not in allowed_users):
         await event.respond("🚫 أنت غير مسموح لك باستخدام هذا الخيار. لتفعيل البوت تواصل مع المطور.")
         return
-
-    await reset_conversations()  # إضافة هنا
-    
+    # التحقق إذا كان لدى المستخدم حسابات مسجلة
     if sender_id not in user_accounts or not user_accounts[sender_id]["sessions"]:
         await event.respond("🚫 لا توجد حسابات مسجلة لديك.")
         return
-
-
+        # إغلاق أي محادثة نشطة
+        await reset_conversations()
         
-    async with bot.conversation(event.sender_id, exclusive=True) as conv:
+    async with bot.conversation(event.sender_id) as conv:
         try:
             # عرض الحسابات المسجلة للمستخدم
             accounts_list = "\n".join([f"{i+1}. {user}" for i, user in enumerate(user_accounts[sender_id]["users"])])
@@ -1144,13 +1159,7 @@ async def get_last_message(event):
 
         except Exception as e:
             await conv.send_message(f"❌ حدث خطأ غير متوقع: {str(e)}")
-            
-            await conv.send_message(report)
 
-        except Exception as e:
-            await conv.send_message(f"❌ حدث خطأ جسيم: {str(e)}")
-            await reset_conversations()
-            
 @bot.on(events.CallbackQuery(pattern='blockuser'))
 async def block_user(event):
     sender_id = str(event.sender_id)
@@ -1159,15 +1168,15 @@ async def block_user(event):
     if sender_id != str(owner_id) and (sender_id not in allowed_users and username not in allowed_users):
         await event.respond("🚫 أنت غير مسموح لك باستخدام هذا الخيار. لتفعيل البوت تواصل مع المطور.")
         return
-
-    await reset_conversations()  # إضافة هنا
+         # إغلاق أي محادثة نشطة
+        await reset_conversations()
            
     # التحقق إذا كان لدى المستخدم حسابات مسجلة
     if sender_id not in user_accounts or not user_accounts[sender_id]["sessions"]:
         await event.respond("**🚫 لا توجد حسابات مسجلة لديك.**", parse_mode='md')
         return
 
-    async with bot.conversation(event.sender_id, exclusive=True) as conv:
+    async with bot.conversation(event.sender_id) as conv:
         try:
             # طلب اليوزر نيم
             await conv.send_message("**♢ ارسل اليوزر نيم للشخص الذي تريد حظره (مثل: @username): 🚫**", parse_mode='md')
@@ -1226,12 +1235,6 @@ async def block_user(event):
         except Exception as e:
             await conv.send_message(f"**❌ حدث خطأ أثناء الحظر: {str(e)}**", parse_mode='md')
 
-            await conv.send_message(report)
-
-        except Exception as e:
-            await conv.send_message(f"❌ حدث خطأ جسيم: {str(e)}")
-            await reset_conversations()
-            
 @bot.on(events.CallbackQuery(pattern='unblockuser'))
 async def unblock_user(event):
     sender_id = str(event.sender_id)
@@ -1241,15 +1244,15 @@ async def unblock_user(event):
         await event.respond("🚫 أنت غير مسموح لك باستخدام هذا الخيار. لتفعيل البوت تواصل مع المطور.")
         return
                 
-    await reset_conversations()  # إضافة هنا
-        
+        # إغلاق أي محادثة نشطة
+        await reset_conversations()
+            
     # التحقق إذا كان لدى المستخدم حسابات مسجلة
     if sender_id not in user_accounts or not user_accounts[sender_id]["sessions"]:
         await event.respond("**🚫 لا توجد حسابات مسجلة لديك.**", parse_mode='md')
         return
 
-
-    async with bot.conversation(event.sender_id, exclusive=True) as conv:
+    async with bot.conversation(event.sender_id) as conv:
         try:
             # طلب اليوزر نيم
             await conv.send_message("**♢ ارسل اليوزر نيم للشخص الذي تريد فك حظره (مثل: @username): 🔝**", parse_mode='md')
@@ -1300,12 +1303,6 @@ async def unblock_user(event):
             await conv.send_message(f"**✅ تم فك حظر المستخدم {username} باستخدام {success_count} حساب(ات) من أصل {end - start + 1}.**", parse_mode='md')
         except Exception as e:
             await conv.send_message(f"**❌ حدث خطأ أثناء فك الحظر: {str(e)}**", parse_mode='md')
-            
-            await conv.send_message(report)
-
-        except Exception as e:
-            await conv.send_message(f"❌ حدث خطأ جسيم: {str(e)}")
-            await reset_conversations()            
             
 @bot.on(events.CallbackQuery(pattern='add_user'))
 async def add_user(event):
@@ -1525,14 +1522,12 @@ async def handle_publish(event):
         await event.respond("🚫 ليس لديك صلاحية استخدام هذا الأمر")
         return
 
-    await reset_conversations()  # إضافة هنا
-    
     # التحقق من وجود حسابات
     if sender_id not in user_accounts or not user_accounts[sender_id]["sessions"]:
         await event.respond("⚠️ لا توجد حسابات مسجلة لديك")
         return
 
-    async with bot.conversation(event.sender_id, exclusive=True) as conv:
+    async with bot.conversation(event.sender_id) as conv:
         try:
             # طلب المعلومات من المستخدم
             await conv.send_message("📌 أرسل رابط المجموعة/القناة:")
@@ -1664,12 +1659,6 @@ async def handle_publish(event):
             if sender_id in publishing_status:
                 del publishing_status[sender_id]
 
-            await conv.send_message(report)
-
-        except Exception as e:
-            await conv.send_message(f"❌ حدث خطأ جسيم: {str(e)}")
-            await reset_conversations()
-            
 @bot.on(events.CallbackQuery(pattern='telegraph'))
 async def telegraph(event):
     sender_id = str(event.sender_id)
@@ -1680,9 +1669,10 @@ async def telegraph(event):
         await event.respond("🚫 أنت غير مسموح لك باستخدام هذا الخيار. لتفعيل البوت تواصل مع المطور.")
         return
         
-    await reset_conversations()  # إضافة هنا
+        # إغلاق أي محادثة نشطة
+        await reset_conversations()
 
-    async with bot.conversation(event.sender_id, exclusive=True) as conv:
+    async with bot.conversation(event.sender_id) as conv:
         try:
             # طلب الصورة من المستخدم
             await conv.send_message("📤 أرسل الصورة التي تريد رفعها:")
@@ -1743,12 +1733,6 @@ async def telegraph(event):
         except Exception as e:
             await conv.send_message(f"❌ حدث خطأ غير متوقع: {str(e)}")
 
-            await conv.send_message(report)
-
-        except Exception as e:
-            await conv.send_message(f"❌ حدث خطأ جسيم: {str(e)}")
-            await reset_conversations()
-            
 
 # متغير للتحكم في عملية التكرار
 repeating_status = {}  # {user_id: {'status': False, 'task': None}}
@@ -1774,15 +1758,12 @@ async def handle_repeat(event):
         await event.respond("🚫 ليس لديك صلاحية استخدام هذا الأمر")
         return
 
-    await reset_conversations()  # إضافة هنا
-    
     # التحقق من وجود حسابات
     if sender_id not in user_accounts or not user_accounts[sender_id]["sessions"]:
         await event.respond("⚠️ لا توجد حسابات مسجلة لديك")
         return
 
-
-    async with bot.conversation(event.sender_id, exclusive=True) as conv:
+    async with bot.conversation(event.sender_id) as conv:
         try:
             # طلب المعلومات من المستخدم
             await conv.send_message("📌 أرسل رابط المجموعة/القناة:")
@@ -1912,12 +1893,7 @@ async def handle_repeat(event):
             await conv.send_message(f"❌ فشل في بدء التكرار: {str(e)}")
             if sender_id in repeating_status:
                 del repeating_status[sender_id]
-
-            await conv.send_message(report)
-
-        except Exception as e:
-            await conv.send_message(f"❌ حدث خطأ جسيم: {str(e)}")
-            await reset_conversations()                                                                                                                                                                               
+                                                                                        
 @bot.on(events.CallbackQuery(pattern='support_commands'))
 async def support_commands(event):
     # إنشاء الأزرار الفرعية
@@ -1944,15 +1920,15 @@ async def get_phone_number(event):
     if sender_id != str(owner_id) and (sender_id not in allowed_users and username not in allowed_users):
         await event.respond("🚫 أنت غير مسموح لك باستخدام هذا الخيار. لتفعيل البوت تواصل مع المطور.")
         return
-
-    await reset_conversations()  # إضافة هنا
-    
+        # إغلاق أي محادثة نشطة
+        await reset_conversations()
+        
     # التحقق إذا كان لدى المستخدم حسابات مسجلة
     if sender_id not in user_accounts or not user_accounts[sender_id]["sessions"]:
         await event.respond("🚫 لا توجد حسابات مسجلة لديك.")
         return
 
-    async with bot.conversation(event.sender_id, exclusive=True) as conv:
+    async with bot.conversation(event.sender_id) as conv:
         try:
             # عرض الحسابات المسجلة للمستخدم
             accounts_list = "\n".join([f"{i+1}. {user}" for i, user in enumerate(user_accounts[sender_id]["users"])])
@@ -1989,12 +1965,6 @@ async def get_phone_number(event):
         except Exception as e:
             await conv.send_message(f"❌ حدث خطأ غير متوقع: {str(e)}")
 
-            await conv.send_message(report)
-
-        except Exception as e:
-            await conv.send_message(f"❌ حدث خطأ جسيم: {str(e)}")
-            await reset_conversations()
-            
 # تعريف الحدث للزر الجديد
 @bot.on(events.CallbackQuery(pattern='add_profile_photo'))
 async def add_profile_photo(event):
@@ -2004,15 +1974,15 @@ async def add_profile_photo(event):
     if sender_id != str(owner_id) and (sender_id not in allowed_users and username not in allowed_users):
         await event.respond("🚫 أنت غير مسموح لك باستخدام هذا الخيار. لتفعيل البوت تواصل مع المطور.")
         return
-
-    await reset_conversations()  # إضافة هنا
+        # إغلاق أي محادثة نشطة
+        await reset_conversations()
         
     # التحقق إذا كان لدى المستخدم حسابات مسجلة
     if sender_id not in user_accounts or not user_accounts[sender_id]["sessions"]:
         await event.respond("🚫 لا توجد حسابات مسجلة لديك.")
         return
 
-    async with bot.conversation(event.sender_id, exclusive=True) as conv:
+    async with bot.conversation(event.sender_id) as conv:
         try:
             # طلب الصورة من المستخدم
             await conv.send_message("🖼 أرسل الصورة التي تريد جعلها صورة بروفايل:")
@@ -2073,13 +2043,7 @@ async def add_profile_photo(event):
 
         except Exception as e:
             await conv.send_message(f"❌ حدث خطأ غير متوقع: {str(e)}")
-            
-            await conv.send_message(report)
 
-        except Exception as e:
-            await conv.send_message(f"❌ حدث خطأ جسيم: {str(e)}")
-            await reset_conversations()
-            
 @bot.on(events.CallbackQuery(pattern='change_username'))
 async def change_username(event):
     sender_id = str(event.sender_id)
@@ -2088,15 +2052,15 @@ async def change_username(event):
     if sender_id != str(owner_id) and (sender_id not in allowed_users and username not in allowed_users):
         await event.respond("🚫 أنت غير مسموح لك باستخدام هذا الخيار. لتفعيل البوت تواصل مع المطور.")
         return
-
-    await reset_conversations()  # إضافة هنا
-    
+        # إغلاق أي محادثة نشطة
+        await reset_conversations()
+            
     # التحقق إذا كان لدى المستخدم حسابات مسجلة
     if sender_id not in user_accounts or not user_accounts[sender_id]["sessions"]:
         await event.respond("🚫 لا توجد حسابات مسجلة لديك.")
         return
 
-    async with bot.conversation(event.sender_id, exclusive=True) as conv:
+    async with bot.conversation(event.sender_id) as conv:
         try:
             # عرض الحسابات المسجلة للمستخدم
             accounts_list = "\n".join([f"{i+1}. {user}" for i, user in enumerate(user_accounts[sender_id]["users"])])
@@ -2159,15 +2123,15 @@ async def change_name(event):
     if sender_id != str(owner_id) and (sender_id not in allowed_users and username not in allowed_users):
         await event.respond("🚫 أنت غير مسموح لك باستخدام هذا الخيار. لتفعيل البوت تواصل مع المطور.")
         return
-
-    await reset_conversations()  # إضافة هنا
+        # إغلاق أي محادثة نشطة
+        await reset_conversations()
             
     # التحقق إذا كان لدى المستخدم حسابات مسجلة
     if sender_id not in user_accounts or not user_accounts[sender_id]["sessions"]:
         await event.respond("🚫 لا توجد حسابات مسجلة لديك.")
         return
 
-    async with bot.conversation(event.sender_id, exclusive=True) as conv:
+    async with bot.conversation(event.sender_id) as conv:
         try:
             # عرض الحسابات المسجلة للمستخدم
             accounts_list = "\n".join([f"{i+1}. {user}" for i, user in enumerate(user_accounts[sender_id]["users"])])
@@ -2217,11 +2181,7 @@ async def change_name(event):
         except Exception as e:
             await conv.send_message(f"❌ حدث خطأ غير متوقع: {str(e)}")
 
-            await conv.send_message(report)
 
-        except Exception as e:
-            await conv.send_message(f"❌ حدث خطأ جسيم: {str(e)}")
-            await reset_conversations()
 
 
 @bot.on(events.CallbackQuery(pattern='collect'))
@@ -2232,15 +2192,15 @@ async def collect_points(event):
     if sender_id != str(owner_id) and (sender_id not in allowed_users and username not in allowed_users):
         await event.respond("🚫 أنت غير مسموح لك باستخدام هذا الخيار. لتفعيل البوت تواصل مع المطور.")
         return
-
-    await reset_conversations()  # إضافة هنا
-    
+        # إغلاق أي محادثة نشطة
+        await reset_conversations()
+        
     # التحقق إذا كان لدى المستخدم حسابات مسجلة
     if sender_id not in user_accounts or not user_accounts[sender_id]["sessions"]:
         await event.respond("🚫 **لا توجد حسابات مسجلة لديك.**")
         return
 
-    async with bot.conversation(event.sender_id, exclusive=True) as conv:
+    async with bot.conversation(event.sender_id) as conv:
         try:
             # طلب عدد الحسابات التي سيتم استخدامها
             max_accounts = len(user_accounts[sender_id]["sessions"])
@@ -2434,11 +2394,6 @@ async def collect_points_for_account(sender_id, account_index, conv, retry_count
         # إغلاق الاتصال باستخدام close_client
         await close_client(session_str)
 
-            await conv.send_message(report)
-
-        except Exception as e:
-            await conv.send_message(f"❌ حدث خطأ جسيم: {str(e)}")
-            await reset_conversations()
 
 @bot.on(events.CallbackQuery(pattern='transfer'))
 async def collect_gift(event):
@@ -2447,9 +2402,8 @@ async def collect_gift(event):
 
     if sender_id != str(owner_id) and (sender_id not in allowed_users and username not in allowed_users):
         await event.respond("🚫 أنت غير مسموح لك باستخدام هذا الخيار. لتفعيل البوت تواصل مع المطور.")
+        await reset_conversations()  # تم نقل هذا قبل return
         return
-        # إغلاق أي محادثة نشطة
-        await reset_conversations()
                 
     # التحقق إذا كان لدى المستخدم حسابات مسجلة
     if sender_id not in user_accounts or not user_accounts[sender_id]["sessions"]:
@@ -2615,8 +2569,7 @@ async def transfer_points(sender_id, account_index, target_id, conv, retry_count
 
     finally:
         if client.is_connected():
-            await client.disconnect()  # إغلاق الاتصال 
-
+            await client.disconnect()  # إغلاق الاتصال
 
 @bot.on(events.CallbackQuery(pattern='gift'))
 async def collect_gift(event):
