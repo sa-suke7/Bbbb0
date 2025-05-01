@@ -1751,18 +1751,18 @@ async def telegraph(event):
     sender_id = str(event.sender_id)
     username = f"@{event.sender.username}" if event.sender.username else sender_id
 
-    # التحقق من الصلاحيات (غير متزامن)
+    # التحقق من الصلاحيات
     if sender_id != str(owner_id) and (sender_id not in allowed_users and username not in allowed_users):
         await event.respond("🚫 أنت غير مسموح لك باستخدام هذا الخيار.")
         return
 
     async with bot.conversation(event.sender_id) as conv:
         try:
-            # طلب الصورة (يعمل بالتزامن مع أوامر أخرى)
+            # طلب الصورة
             await conv.send_message("📤 أرسل الصورة التي تريد رفعها (يمكنك إلغاء العملية بأي وقت):")
             photo_task = asyncio.create_task(conv.get_response())
             
-            # انتظار الرد مع إمكانية الإلغاء
+            # انتظار الرد
             done, pending = await asyncio.wait(
                 {photo_task},
                 return_when=asyncio.FIRST_COMPLETED
@@ -1780,7 +1780,7 @@ async def telegraph(event):
                 await conv.send_message("🚫 لم تقم بإرسال صورة صالحة.")
                 return
 
-            # تنزيل الصورة (يعمل في الخلفية)
+            # تنزيل الصورة
             download_task = asyncio.create_task(photo.download_media())
             photo_path = await download_task
             
@@ -1791,9 +1791,8 @@ async def telegraph(event):
                 await conv.send_message("🚫 حجم الصورة يتجاوز 10MB")
                 return
 
-            # رفع الصورة (يعمل في الخلفية)
-            upload_task = asyncio.create_task(
-                upload_to_catbox(photo_path)
+            # رفع الصورة (تم تصحيح السطر هنا بإغلاق الأقواس)
+            upload_task = asyncio.create_task(upload_to_catbox(photo_path))
             image_url = await upload_task
             
             if image_url.startswith('http'):
@@ -1822,17 +1821,16 @@ async def upload_to_catbox(file_path):
         with open(file_path, 'rb') as f:
             async with aiohttp.ClientSession() as session:
                 data = aiohttp.FormData()
-                data.add_field('reqtype', 'fileupload')  # تم إضافة reqtype هنا
+                data.add_field('reqtype', 'fileupload')
                 data.add_field('fileToUpload', f)
                 
                 async with session.post(
                     'https://catbox.moe/user/api.php',
-                    data=data  # تم تصحيح الخطأ بإزالة المعلمة المكررة
+                    data=data
                 ) as response:
                     return await response.text()
     except Exception as e:
         return str(e)
-
                                                                                         
 @bot.on(events.CallbackQuery(pattern='support_commands'))
 async def support_commands(event):
