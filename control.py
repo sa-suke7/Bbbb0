@@ -869,7 +869,7 @@ async def activate_online(event):
             await conv.send_message("✅ تم إعادة الحسابات إلى وضع الأوفلاين بعد 10 ثواني.")
         except Exception as e:
             await conv.send_message(f"❌ حدث خطأ أثناء تنشيط الحسابات: {str(e)}")
-t
+
 
 # متغير لتتبع المهام النشطة
 active_view_jobs = defaultdict(dict)
