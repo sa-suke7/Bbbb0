@@ -8,7 +8,7 @@ import threading
 import http.server
 import socketserver
 import asyncio
-from collections import defaultdic
+from collections import defaultdict
 # ===== مكتبات الطرف الثالث (Third-Party Libraries) =====
 import requests
 import psycopg2
