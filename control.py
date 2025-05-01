@@ -848,7 +848,7 @@ async def handle_view_story(event):
     
     # التحقق من وجود حسابات مسجلة (سواء Telethon أو Pyrogram)
     if sender_id not in user_accounts or not user_accounts[sender_id].get("sessions"):
-        await event.respond("🚫 لا توجد حسابات مسجلة لديك.\nيرجى إضافة حسابات أولاً.")
+        await event.respond("🚫 لا توجد حسابات مسجلة لديك.\nيرجى إضافتها أولاً.")
         return
 
     async with bot.conversation(event.sender_id) as conv:
@@ -910,9 +910,10 @@ async def handle_view_story(event):
 
                     # مشاهدة الاستوري باستخدام raw API
                     try:
+                        # الطريقة الصحيحة لمشاهدة الاستوري في الإصدارات الحديثة من Telethon
                         await client(functions.stories.ReadStoriesRequest(
                             peer=entity,
-                            id=[story_id]
+                            max_id=story_id
                         ))
                         successful += 1
                         await conv.send_message(f"✅ الحساب {i+1}: تمت مشاهدة الاستوري بنجاح")
@@ -942,7 +943,6 @@ async def handle_view_story(event):
 
         except Exception as e:
             await conv.send_message(f"❌ حدث خطأ جسيم: {str(e)}\nيرجى المحاولة مرة أخرى.")
-
 
 @bot.on(events.CallbackQuery(pattern='zezo'))
 async def view_post(event):
@@ -1499,11 +1499,24 @@ async def publish(event):
 يمكنك إيقافه في أي وقت باستخدام زر 'إيقاف النشر'
             """)
 
-            while publishing_status.get(sender_id, {}).get('is_publishing', False):
+            # إضافة متغير للتحقق من حالة النشر
+            should_continue_publishing = True
+            
+            while should_continue_publishing:
+                # التحقق من حالة النشر في بداية كل تكرار
+                if not publishing_status.get(sender_id, {}).get('is_publishing', False):
+                    should_continue_publishing = False
+                    break
+                    
                 current_iteration = publishing_status[sender_id]['iteration']
                 await conv.send_message(f"🔄 جولة النشر رقم {current_iteration}")
                 
                 for group_idx, group in enumerate(groups):
+                    # التحقق من حالة النشر قبل كل مجموعة
+                    if not publishing_status.get(sender_id, {}).get('is_publishing', False):
+                        should_continue_publishing = False
+                        break
+                        
                     if not group['active']:
                         continue
                         
@@ -1512,11 +1525,13 @@ async def publish(event):
                     await conv.send_message(f"📤 جاري النشر في مجموعة: {group['title']}")
                     
                     for i in account_indices:
+                        # التحقق من حالة النشر قبل كل حساب
+                        if not publishing_status.get(sender_id, {}).get('is_publishing', False):
+                            should_continue_publishing = False
+                            break
+
                         if i >= max_accounts:
                             continue
-
-                        if not publishing_status.get(sender_id, {}).get('is_publishing', False):
-                            break
 
                         session_str = user_accounts[sender_id]["sessions"][i]
                         client = TelegramClient(StringSession(session_str), api_id, api_hash)
@@ -1550,14 +1565,14 @@ async def publish(event):
                         await client.disconnect()
                         await asyncio.sleep(interval)
 
-                        if not publishing_status.get(sender_id, {}).get('is_publishing', False):
-                            break
-
-                    if not publishing_status.get(sender_id, {}).get('is_publishing', False):
+                    if not should_continue_publishing:
                         break
 
                     # تأخير بين المجموعات
                     await asyncio.sleep(5)
+
+                if not should_continue_publishing:
+                    break
 
                 publishing_status[sender_id]['iteration'] += 1
                 await asyncio.sleep(1)
@@ -1569,8 +1584,8 @@ async def publish(event):
         except Exception as e:
             await conv.send_message(f"❌ حدث خطأ أثناء النشر: {str(e)}")
             if sender_id in publishing_status:
+                publishing_status[sender_id]['is_publishing'] = False
                 del publishing_status[sender_id]
-
 
 
 # متغيرات التحكم في التكرار
@@ -1733,15 +1748,25 @@ async def repeat_message(event):
             """)
 
             current_round = 0
-            while (repeat_status.get(sender_id, {}).get('is_repeating', False) and 
-                  current_round < repeat_status[sender_id]['total_rounds']):
-                
+            should_continue = True
+            
+            while should_continue:
+                # التحقق من حالة التكرار في بداية كل جولة
+                if not repeat_status.get(sender_id, {}).get('is_repeating', False):
+                    should_continue = False
+                    break
+                    
                 current_round += 1
                 repeat_status[sender_id]['current_round'] = current_round
                 
                 await conv.send_message(f"🔄 جولة التكرار رقم {current_round}")
                 
                 for group_idx, group in enumerate(groups):
+                    # التحقق من حالة التكرار قبل كل مجموعة
+                    if not repeat_status.get(sender_id, {}).get('is_repeating', False):
+                        should_continue = False
+                        break
+                        
                     if not group['active']:
                         continue
                         
@@ -1750,7 +1775,9 @@ async def repeat_message(event):
                     await conv.send_message(f"📤 جاري التكرار في مجموعة: {group['title']}")
                     
                     for i in valid_accounts:
+                        # التحقق من حالة التكرار قبل كل حساب
                         if not repeat_status.get(sender_id, {}).get('is_repeating', False):
+                            should_continue = False
                             break
 
                         try:
@@ -1781,25 +1808,31 @@ async def repeat_message(event):
                         if i != valid_accounts[-1]:  # لا تنتظر بعد آخر حساب
                             await asyncio.sleep(interval)
 
-                    if not repeat_status.get(sender_id, {}).get('is_repeating', False):
+                    if not should_continue:
                         break
 
                     # تأخير بين المجموعات
                     await asyncio.sleep(5)
 
+                # التحقق إذا وصلنا لعدد المرات المطلوبة
+                if not is_infinite and current_round >= repeat_count:
+                    should_continue = False
+                    break
+                    
                 # تأخير بين الجولات
-                if current_round < repeat_status[sender_id]['total_rounds'] and repeat_status.get(sender_id, {}).get('is_repeating', False):
+                if should_continue and repeat_status.get(sender_id, {}).get('is_repeating', False):
                     await asyncio.sleep(10)
 
             # تنظيف الحالة بعد الانتهاء
             if sender_id in repeat_status:
                 del repeat_status[sender_id]
                 
-            await conv.send_message(f"✅ تم إنهاء التكرار {'بعد الإيقاف' if current_round < repeat_count else 'بعد إكمال جميع الجولات'}")
+            await conv.send_message(f"✅ تم إنهاء التكرار {'بعد الإيقاف' if not should_continue and current_round < repeat_count else 'بعد إكمال جميع الجولات'}")
 
         except Exception as e:
             await conv.send_message(f"❌ حدث خطأ: {str(e)}")
             if sender_id in repeat_status:
+                repeat_status[sender_id]['is_repeating'] = False
                 del repeat_status[sender_id]
 
 
