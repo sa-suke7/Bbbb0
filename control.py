@@ -1378,7 +1378,7 @@ async def back_to_main(event):
     if str(event.sender_id) == str(owner_id):
         buttons.append([Button.inline('✅ إضافة اشتراك ', 'add_user'), Button.inline('❌ حذف اشتراك ', 'remove_user')])
 
-:# متغيرات للتحكم في عملية النشر
+# متغيرات للتحكم في عملية النشر
 publishing_status = {}  # {'user_id': {'is_publishing': True/False, 'groups': [group1, group2], 'current_group': 0}}
 
 @bot.on(events.CallbackQuery(pattern='stop_publish'))
