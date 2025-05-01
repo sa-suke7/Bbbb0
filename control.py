@@ -1572,22 +1572,23 @@ async def start_publishing(event):
 
 # متغيرات التحكم في التكرار
 repeat_status = {}
-
-@bot.on(events.CallbackQuery(pattern='stop_repeat'))
-async def stop_repeating(event):
+    
+@bot.on(events.CallbackQuery(pattern='stop_publish'))
+async def stop_publishing(event):
     sender_id = str(event.sender_id)
     
-    if sender_id not in repeat_status:
-        await event.respond("⚠️ لا توجد عملية تكرار نشطة لإيقافها.")
+    if sender_id not in publishing_status or not publishing_status[sender_id]['is_publishing']:
+        await event.respond("⚠️ لا توجد عملية نشر نشطة لإيقافها.")
         return
     
     # إرسال قائمة المجموعات مباشرة دون انتظار رد
-    groups = repeat_status[sender_id]['groups']
+    groups = publishing_status[sender_id]['groups']
     buttons = []
     for i, group in enumerate(groups, 1):
         status = "🟢" if group['active'] else "🔴"
-        buttons.append([Button.inline(f"{status} {group['title']", f"stop_group:{i-1}")])
-    buttons.append([Button.inline("🛑 إيقاف الكل", b"stop_all")])
+        buttons.append([Button.inline(f"{status} {group['title']}", f"stop_group:{i-1}")])
+    
+    buttons.append([Button.inline("🛑 إيقاف الكل", "stop_all")])  # تم إزالة b من هنا
     
     await event.respond(
         "📋 اختر المجموعة التي تريد إيقافها:",
