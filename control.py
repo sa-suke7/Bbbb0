@@ -1598,12 +1598,6 @@ async def publish(event):
             if sender_id in publishing_status:
                 del publishing_status[sender_id]
 
-
-
-
-
-
-
 # متغيرات التحكم في التكرار
 repeat_status = {}  # {'user_id': {'is_repeating': True/False, 'groups': [group1, group2], 'current_group': 0, 'current_round': 0}}
 
@@ -1817,14 +1811,14 @@ async def repeat_message(event):
                     if not repeat_status.get(sender_id, {}).get('is_repeating', False):
                         break
 
-                    # انتظار 5 ثوان بين المجموعات
+                    # انتظار الفاصل الزمني بين المجموعات
                     if group_idx != len(groups)-1 and repeat_status.get(sender_id, {}).get('is_repeating', False):
-                        await asyncio.sleep(5)
+                        await asyncio.sleep(interval)
 
-                # انتظار 10 ثوان بين الجولات
+                # انتظار الفاصل الزمني بين الجولات
                 if (repeat_status.get(sender_id, {}).get('is_repeating', False) and 
                     (is_infinite or current_round < repeat_count)):
-                    await asyncio.sleep(10)
+                    await asyncio.sleep(interval)
 
             # تنظيف الحالة بعد الانتهاء
             if sender_id in repeat_status:
