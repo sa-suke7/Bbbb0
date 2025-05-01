@@ -8,7 +8,7 @@ import asyncio
 import threading
 import http.server
 import socketserver
-import datetime
+from datetime import datetime
 # ===== مكتبات الطرف الثالث (Third-Party Libraries) =====
 import requests
 import psycopg2
@@ -846,7 +846,7 @@ async def handle_view_story(event):
         await event.respond("🚫 أنت غير مسموح لك باستخدام هذا الخيار.")
         return
     
-    # التحقق من وجود حسابات مسجلة (سواء Telethon أو Pyrogram)
+    # التحقق من وجود حسابات مسجلة
     if sender_id not in user_accounts or not user_accounts[sender_id].get("sessions"):
         await event.respond("🚫 لا توجد حسابات مسجلة لديك.\nيرجى إضافتها أولاً.")
         return
@@ -857,21 +857,19 @@ async def handle_view_story(event):
             await conv.send_message("♢ أرسل رابط الاستوري (مثال: https://t.me/username/123):")
             story_url = (await conv.get_response()).text.strip()
 
-            # التحقق من صحة الرابط واستخراج المعلومات
+            # معالجة الرابط واستخراج المعلومات
+            def extract_story_info(url):
+                url = url.replace("https://t.me/", "").replace("http://t.me/", "")
+                if "/s/" in url:
+                    parts = url.split('/')
+                    return parts[-3], int(parts[-1])
+                else:
+                    parts = url.split('/')
+                    return parts[-2], int(parts[-1])
+
             try:
-                if "t.me/" not in story_url:
-                    raise ValueError
-                
-                # معالجة الروابط المختلفة
-                if "/s/" in story_url:  # صيغة الروابط الجديدة
-                    parts = story_url.split('/')
-                    username = parts[-3]
-                    story_id = int(parts[-1])
-                else:  # صيغة الروابط القديمة
-                    parts = story_url.split('/')
-                    username = parts[-2]
-                    story_id = int(parts[-1])
-            except (ValueError, IndexError):
+                username, story_id = extract_story_info(story_url)
+            except Exception:
                 await conv.send_message("❌ صيغة الرابط غير صحيحة. مثال صحيح:\nhttps://t.me/username/123\nأو\nhttps://t.me/username/s/123")
                 return
 
@@ -889,12 +887,16 @@ async def handle_view_story(event):
                 account_indices = list(range(min(account_count, max_accounts)))
 
             successful = 0
-            for i in account_indices:
+            total_accounts = len(account_indices)
+            processing_msg = await conv.send_message("⏳ جاري معالجة الحسابات...")
+
+            for idx, i in enumerate(account_indices, 1):
                 if i >= max_accounts:
-                    await conv.send_message(f"⚠️ تخطي الحساب {i+1} - غير موجود")
+                    await processing_msg.edit(f"⚠️ تخطي الحساب {i+1} - غير موجود")
                     continue
 
                 session_str = user_accounts[sender_id]["sessions"][i]
+                client = None
                 
                 try:
                     # إنشاء عميل Telethon
@@ -905,39 +907,64 @@ async def handle_view_story(event):
                     try:
                         entity = await client.get_entity(username)
                     except Exception as e:
-                        await conv.send_message(f"❌ الحساب {i+1}: لا يمكن العثور على المستخدم - {str(e)}")
+                        await processing_msg.edit(f"❌ الحساب {i+1}: لا يمكن العثور على المستخدم - {str(e)}")
                         continue
 
-                    # مشاهدة الاستوري باستخدام raw API
+                    # التحقق من دعم الاستوريز
+                    if not hasattr(entity, 'stories'):
+                        await processing_msg.edit(f"❌ الحساب {i+1}: هذا الكيان لا يدعم الاستوريز")
+                        continue
+
+                    # مشاهدة الاستوري مع إجراءات إضافية لضمان الاحتساب
                     try:
-                        # الطريقة الصحيحة لمشاهدة الاستوري في الإصدارات الحديثة من Telethon
+                        # 1. إرسال طلب قراءة الاستوري
                         await client(functions.stories.ReadStoriesRequest(
                             peer=entity,
                             max_id=story_id
                         ))
-                        successful += 1
-                        await conv.send_message(f"✅ الحساب {i+1}: تمت مشاهدة الاستوري بنجاح")
-                    except Exception as e:
-                        await conv.send_message(f"⚠️ الحساب {i+1}: لم يتم مشاهدة الاستوري - {str(e)}")
 
-                except FloodWaitError as e:
-                    wait_time = e.seconds
-                    await conv.send_message(f"⏳ الحساب {i+1}: يجب الانتظار {wait_time} ثانية بسبب FloodWait")
-                    await asyncio.sleep(wait_time)
-                    continue
+                        # 2. انتظار عشوائي بين 3-7 ثواني لمحاكاة السلوك البشري
+                        await asyncio.sleep(random.uniform(3, 7))
+
+                        # 3. طلب معلومات الاستوري للتأكيد
+                        story = await client(functions.stories.GetStoriesByIDRequest(
+                            peer=entity,
+                            id=[story_id]
+                        ))
+                        
+                        if story.stories:
+                            successful += 1
+                            await processing_msg.edit(f"✅ [{idx}/{total_accounts}] الحساب {i+1}: تمت مشاهدة الاستوري بنجاح")
+                        else:
+                            await processing_msg.edit(f"⚠️ [{idx}/{total_accounts}] الحساب {i+1}: الاستوري غير موجود")
+
+                    except FloodWaitError as e:
+                        wait_time = e.seconds
+                        await processing_msg.edit(f"⏳ [{idx}/{total_accounts}] الحساب {i+1}: يجب الانتظار {wait_time} ثانية")
+                        await asyncio.sleep(wait_time)
+                        continue
+                    except Exception as e:
+                        await processing_msg.edit(f"⚠️ [{idx}/{total_accounts}] الحساب {i+1}: {str(e)}")
+
                 except Exception as e:
-                    await conv.send_message(f"❌ الحساب {i+1}: خطأ غير متوقع - {str(e)}")
+                    await processing_msg.edit(f"❌ [{idx}/{total_accounts}] الحساب {i+1}: خطأ غير متوقع - {str(e)}")
                 finally:
-                    if 'client' in locals() and client.is_connected():
+                    if client and client.is_connected():
                         await client.disconnect()
                     
-                    await asyncio.sleep(2)  # تأخير بين الحسابات
+                    # تأخير عشوائي بين الحسابات (5-15 ثانية)
+                    if idx < total_accounts:
+                        delay = random.randint(5, 15)
+                        await processing_msg.edit(f"⏳ [{idx}/{total_accounts}] جاري الانتظار {delay} ثانية...")
+                        await asyncio.sleep(delay)
 
             # إرسال التقرير النهائي
             report = f"📊 تقرير مشاهدة الاستوري:\n\n"
+            report += f"• الحسابات المستخدمة: {total_accounts}\n"
             report += f"• الحسابات الناجحة: {successful}\n"
-            report += f"• الحسابات الفاشلة: {len(account_indices) - successful}\n"
-            report += f"• نسبة النجاح: {round((successful/max(1,len(account_indices)))*100, 2)}%"
+            report += f"• الحسابات الفاشلة: {total_accounts - successful}\n"
+            report += f"• نسبة النجاح: {round((successful/max(1,total_accounts))*100, 2)}%\n\n"
+            report += f"📌 ملاحظة: قد تستغرق المشاهدات بعض الوقت لتظهر في الإحصائيات"
             
             await conv.send_message(report)
 
@@ -1572,6 +1599,11 @@ async def publish(event):
                 del publishing_status[sender_id]
 
 
+
+
+
+
+
 # متغيرات التحكم في التكرار
 repeat_status = {}  # {'user_id': {'is_repeating': True/False, 'groups': [group1, group2], 'current_group': 0, 'current_round': 0}}
 
@@ -1720,7 +1752,8 @@ async def repeat_message(event):
                 'current_group': 0,
                 'current_round': 0,
                 'total_rounds': repeat_count if not is_infinite else float('inf'),
-                'interval': interval
+                'interval': interval,
+                'valid_accounts': valid_accounts
             }
 
             await conv.send_message(f"""
@@ -1733,7 +1766,7 @@ async def repeat_message(event):
 
             current_round = 0
             while (repeat_status.get(sender_id, {}).get('is_repeating', False) and 
-                  current_round < repeat_status[sender_id]['total_rounds']):
+                  (is_infinite or current_round < repeat_count)):
                 
                 current_round += 1
                 repeat_status[sender_id]['current_round'] = current_round
@@ -1748,12 +1781,12 @@ async def repeat_message(event):
                     
                     await conv.send_message(f"📤 جاري التكرار في مجموعة: {group['title']}")
                     
-                    for i in valid_accounts:
+                    for account_idx in valid_accounts:
                         if not repeat_status.get(sender_id, {}).get('is_repeating', False):
                             break
 
                         try:
-                            client = TelegramClient(StringSession(user_accounts[sender_id]["sessions"][i]), api_id, api_hash)
+                            client = TelegramClient(StringSession(user_accounts[sender_id]["sessions"][account_idx]), api_id, api_hash)
                             await client.connect()
                             
                             entity = await client.get_entity(group['link'])
@@ -1762,7 +1795,7 @@ async def repeat_message(event):
                             await conv.send_message(f"""
 ✅ تم الإرسال بنجاح:
 المجموعة: {group['title']}
-الحساب: {i+1}
+الحساب: {account_idx+1}
 الجولة: {current_round}
 الوقت: {datetime.now().strftime('%H:%M:%S')}
                             """)
@@ -1770,27 +1803,27 @@ async def repeat_message(event):
                             await conv.send_message(f"""
 ❌ خطأ في الإرسال:
 المجموعة: {group['title']}
-الحساب: {i+1}
+الحساب: {account_idx+1}
 الخطأ: {str(e)}
                             """)
                         finally:
                             if 'client' in locals() and client.is_connected():
                                 await client.disconnect()
 
-                        # انتظر الفاصل الزمني المحدد بين كل حساب
-                        if repeat_status.get(sender_id, {}).get('is_repeating', False):
+                        # انتظار الفاصل الزمني بين الحسابات (عدا الأخير)
+                        if account_idx != valid_accounts[-1] and repeat_status.get(sender_id, {}).get('is_repeating', False):
                             await asyncio.sleep(interval)
 
                     if not repeat_status.get(sender_id, {}).get('is_repeating', False):
                         break
 
-                    # تأخير بين المجموعات (يمكن تعديله أو إزالته إذا كنت تريد دقة أعلى)
-                    if repeat_status.get(sender_id, {}).get('is_repeating', False):
+                    # انتظار 5 ثوان بين المجموعات
+                    if group_idx != len(groups)-1 and repeat_status.get(sender_id, {}).get('is_repeating', False):
                         await asyncio.sleep(5)
 
-                # تأخير بين الجولات (يمكن تعديله حسب الحاجة)
-                if (current_round < repeat_status[sender_id]['total_rounds'] and 
-                    repeat_status.get(sender_id, {}).get('is_repeating', False)):
+                # انتظار 10 ثوان بين الجولات
+                if (repeat_status.get(sender_id, {}).get('is_repeating', False) and 
+                    (is_infinite or current_round < repeat_count)):
                     await asyncio.sleep(10)
 
             # تنظيف الحالة بعد الانتهاء
@@ -1803,7 +1836,6 @@ async def repeat_message(event):
             await conv.send_message(f"❌ حدث خطأ: {str(e)}")
             if sender_id in repeat_status:
                 del repeat_status[sender_id]
-
 
 @bot.on(events.CallbackQuery(pattern='telegraph'))
 async def telegraph(event):
