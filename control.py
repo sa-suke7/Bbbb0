@@ -1571,6 +1571,7 @@ async def publish(event):
             if sender_id in publishing_status:
                 del publishing_status[sender_id]
 
+
 # متغيرات التحكم في التكرار
 repeat_status = {}  # {'user_id': {'is_repeating': True/False, 'groups': [group1, group2], 'current_group': 0, 'current_round': 0}}
 
@@ -1776,17 +1777,20 @@ async def repeat_message(event):
                             if 'client' in locals() and client.is_connected():
                                 await client.disconnect()
 
-                        if i != valid_accounts[-1]:  # لا تنتظر بعد آخر حساب
+                        # انتظر الفاصل الزمني المحدد بين كل حساب
+                        if repeat_status.get(sender_id, {}).get('is_repeating', False):
                             await asyncio.sleep(interval)
 
                     if not repeat_status.get(sender_id, {}).get('is_repeating', False):
                         break
 
-                    # تأخير بين المجموعات
-                    await asyncio.sleep(5)
+                    # تأخير بين المجموعات (يمكن تعديله أو إزالته إذا كنت تريد دقة أعلى)
+                    if repeat_status.get(sender_id, {}).get('is_repeating', False):
+                        await asyncio.sleep(5)
 
-                # تأخير بين الجولات
-                if current_round < repeat_status[sender_id]['total_rounds'] and repeat_status.get(sender_id, {}).get('is_repeating', False):
+                # تأخير بين الجولات (يمكن تعديله حسب الحاجة)
+                if (current_round < repeat_status[sender_id]['total_rounds'] and 
+                    repeat_status.get(sender_id, {}).get('is_repeating', False)):
                     await asyncio.sleep(10)
 
             # تنظيف الحالة بعد الانتهاء
