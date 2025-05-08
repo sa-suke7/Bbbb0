@@ -1747,7 +1747,8 @@ async def repeat_message(event):
                 'current_round': 0,
                 'total_rounds': repeat_count if not is_infinite else float('inf'),
                 'interval': interval,
-                'valid_accounts': valid_accounts
+                'valid_accounts': valid_accounts,
+                'failed_accounts': []
             }
 
             await conv.send_message(f"""
@@ -1773,6 +1774,7 @@ async def repeat_message(event):
                 # إذا لم يعد هناك حسابات صالحة، توقف
                 if not current_valid_accounts:
                     await conv.send_message("⚠️ توقف التكرار بسبب عدم وجود حسابات صالحة متبقية")
+                    repeat_status[sender_id]['is_repeating'] = False
                     break
                 
                 for group_idx, group in enumerate(groups):
@@ -1785,6 +1787,7 @@ async def repeat_message(event):
                     
                     # استخدام نسخة من القائمة لتجنب مشاكل التعديل أثناء التكرار
                     accounts_to_use = current_valid_accounts.copy()
+                    successful_send = False
                     
                     for account_idx in accounts_to_use:
                         if not repeat_status.get(sender_id, {}).get('is_repeating', False):
@@ -1797,6 +1800,7 @@ async def repeat_message(event):
                                 # إزالة الحساب من القائمة الصالحة
                                 if account_idx in repeat_status[sender_id]['valid_accounts']:
                                     repeat_status[sender_id]['valid_accounts'].remove(account_idx)
+                                    repeat_status[sender_id]['failed_accounts'].append(account_idx)
                                 continue
 
                             client = TelegramClient(StringSession(user_accounts[sender_id]["sessions"][account_idx]), api_id, api_hash)
@@ -1804,6 +1808,7 @@ async def repeat_message(event):
                             
                             entity = await client.get_entity(group['link'])
                             await client.send_message(entity, group['message'])
+                            successful_send = True
                             
                             await conv.send_message(f"""
 ✅ تم الإرسال بنجاح:
@@ -1813,17 +1818,20 @@ async def repeat_message(event):
 الوقت: {datetime.now().strftime('%H:%M:%S')}
                             """)
                         except Exception as e:
-                            await conv.send_message(f"""
+                            error_msg = f"""
 ❌ خطأ في الإرسال:
 المجموعة: {group['title']}
 الحساب: {account_idx+1}
 الخطأ: {str(e)}
-                            """)
-                            # إذا كان الخطأ بسبب أن الحساب لم يعد موجودًا
-                            if "index out of range" in str(e) or "StringSession" in str(e):
+                            """
+                            await conv.send_message(error_msg)
+                            
+                            # إذا كان الخطأ بسبب صلاحيات أو حذف الحساب
+                            if "You can't write in this chat" in str(e) or "index out of range" in str(e) or "StringSession" in str(e):
                                 if account_idx in repeat_status[sender_id]['valid_accounts']:
                                     repeat_status[sender_id]['valid_accounts'].remove(account_idx)
-                                    await conv.send_message(f"⚠️ تم إزالة الحساب {account_idx+1} من قائمة الحسابات الصالحة")
+                                    repeat_status[sender_id]['failed_accounts'].append(account_idx)
+                                    await conv.send_message(f"⚠️ تم إزالة الحساب {account_idx+1} من قائمة الحسابات النشطة")
                         finally:
                             if 'client' in locals() and client.is_connected():
                                 await client.disconnect()
@@ -1831,6 +1839,10 @@ async def repeat_message(event):
                         # انتظار الفاصل الزمني بين الحسابات (عدا الأخير)
                         if account_idx != accounts_to_use[-1] and repeat_status.get(sender_id, {}).get('is_repeating', False):
                             await asyncio.sleep(interval)
+
+                    # إذا لم يتمكن أي حساب من الإرسال في هذه المجموعة
+                    if not successful_send and accounts_to_use:
+                        await conv.send_message(f"⚠️ فشل جميع الحسابات في الإرسال إلى {group['title']}")
 
                     if not repeat_status.get(sender_id, {}).get('is_repeating', False):
                         break
@@ -1842,6 +1854,7 @@ async def repeat_message(event):
                 # التحقق مرة أخرى إذا كانت هناك حسابات صالحة متبقية
                 if not repeat_status[sender_id]['valid_accounts']:
                     await conv.send_message("⚠️ توقف التكرار بسبب عدم وجود حسابات صالحة متبقية")
+                    repeat_status[sender_id]['is_repeating'] = False
                     break
 
                 # انتظار الفاصل الزمني بين الجولات
@@ -1851,6 +1864,10 @@ async def repeat_message(event):
 
             # تنظيف الحالة بعد الانتهاء
             if sender_id in repeat_status:
+                # حفظ الحسابات الفاشلة للإستخدام المستقبلي
+                failed_accounts = repeat_status[sender_id]['failed_accounts']
+                if failed_accounts:
+                    await conv.send_message(f"⚠️ الحسابات التي تم إزالتها: {', '.join(str(acc+1) for acc in failed_accounts)}")
                 del repeat_status[sender_id]
                 
             await conv.send_message(f"✅ تم إنهاء التكرار {'بعد الإيقاف' if current_round < repeat_count else 'بعد إكمال جميع الجولات'}")
@@ -1858,6 +1875,10 @@ async def repeat_message(event):
         except Exception as e:
             await conv.send_message(f"❌ حدث خطأ: {str(e)}")
             if sender_id in repeat_status:
+                # حفظ الحسابات الفاشلة قبل الحذف
+                failed_accounts = repeat_status[sender_id]['failed_accounts']
+                if failed_accounts:
+                    await conv.send_message(f"⚠️ الحسابات التي تم إزالتها: {', '.join(str(acc+1) for acc in failed_accounts)}")
                 del repeat_status[sender_id]
 
 @bot.on(events.CallbackQuery(pattern='telegraph'))
